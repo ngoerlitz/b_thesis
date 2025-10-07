@@ -209,11 +209,10 @@ pub extern "C" fn kernel_main() -> ! {
 
     unsafe {
         mmu::init_enable_mmu_4k_l3_identity();
-        // mmu::intentionally_break();
+        mmu::intentionally_break();
     }
     cpu::enable_irq();
 
-    // TODO: Remove!
     kernel_func();
 
     let runtime = FutureRuntime::new(KernelFutureRuntimeHandler::default()).unwrap();
@@ -345,8 +344,6 @@ fn mask_daif_all() {
 
 #[unsafe(no_mangle)]
 extern "C" fn el1_serror(frame: &mut ExceptionFrame) {
-    mask_daif_all();
-
     let mut lock = unsafe { PL011::new(0xFE201000) };
     let _ = lock.enable();
 

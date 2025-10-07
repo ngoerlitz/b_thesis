@@ -1,3 +1,4 @@
+use crate::platform::aarch64::cpu;
 use crate::{UART0, UartSink};
 use alloc::string::String;
 use core::arch::asm;
@@ -41,11 +42,7 @@ pub fn print_kernel_data(x: i32, y: &i32, z: &String) {
     let el0_sp: u64 = unsafe { &__stack_el0_top as *const _ as u64 };
     let user_fp: u64 = unsafe { user_func as *const () as u64 };
 
-    let _ = writeln!(
-        lock.deref_mut(),
-        "CurrentEL: {}",
-        crate::platform::aarch64::cpu::current_el()
-    );
+    let _ = writeln!(lock.deref_mut(), "CurrentEL: {}", cpu::current_el());
 
     drop(lock);
 
@@ -84,7 +81,7 @@ pub fn print_kernel_data(x: i32, y: &i32, z: &String) {
             "msr SP_EL0, {el0_stack_top}",
             "msr ELR_EL1, {user_func_ptr}",
             "mov  x0, #(1<<9 | 1<<8 | 1<<7)",   // D|A|I masks
-            "msr  SPSR_EL1, x0",                // EL0t + DAIF masked
+            "msr  SPSR_EL1, xzr",                // EL0t + DAIF masked
 
             "isb",
             "eret",
@@ -118,13 +115,13 @@ pub fn user_func() {
             sp
         );
 
-        let _ = writeln!(
-            UartSink,
-            "CurrentEL: {}",
-            crate::platform::aarch64::cpu::current_el()
-        );
+        // let _ = writeln!(
+        //     UartSink,
+        //     "CurrentEL: {}",
+        //     crate::platform::aarch64::cpu::current_el()
+        // );
 
-        for _ in 0..10_000_000 {
+        for _ in 0..50_000_000 {
             unsafe { asm!("nop") }
         }
     }

@@ -9,7 +9,6 @@
 .equ CONTEXT_SIZE, 272 // Must by 16 Byte aligned as per AAPCS64
 
 .macro EXCEPTION_VECTOR handler
-    msr DAIFSet, #0b1111
     sub sp, sp, #CONTEXT_SIZE
 
     // store general purpose registers
@@ -193,5 +192,4 @@ el1_vectors:
     // restore stack pointer
     add sp, sp, #CONTEXT_SIZE
 
-    msr DAIFClr, #0b1111
     eret

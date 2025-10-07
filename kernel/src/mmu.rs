@@ -247,9 +247,6 @@ unsafe fn create_flat_mapping_4g_l3_pages() {
     manually_map(0x3fbe0);
     manually_map(0x3e537);
 
-    dump_pte_for_va(0x7ffefff0);
-    // dump_pte_for_va(0x34b18);
-
     // let mut i = 0;
     // for pt in *&raw const L3 {
     //     dump_l3_entry(i, pt.0[0]);
