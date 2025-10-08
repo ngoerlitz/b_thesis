@@ -215,16 +215,15 @@ unsafe fn create_flat_mapping_4g_l3_pages() {
             for l3j in 0..PGTAB_ENTRIES {
                 let pa = base | ((l3j as u64) << 12);
 
-                if in_ram(pa) {
-                    // Normal WBWA; if you want “everything exec” in RAM, keep pxn/uxn=false.
-                    L3[l3_idx].0[l3j] =
-                        l3_page_desc(pa, ATTRIDX_NORMAL, SH_IS, AP_EL1_RW_EL0_NO, false, false);
-                } else if is_mmio(pa) {
+                if is_mmio(pa) {
                     // Device, XN
                     L3[l3_idx].0[l3j] =
                         l3_page_desc(pa, ATTRIDX_DEVICE, SH_IS, AP_EL1_RW_EL0_RW, true, true);
+                } else if in_ram(pa) {
+                    // Normal WBWA; if you want “everything exec” in RAM, keep pxn/uxn=false.
+                    L3[l3_idx].0[l3j] =
+                        l3_page_desc(pa, ATTRIDX_NORMAL, SH_IS, AP_EL1_RW_EL0_NO, false, false);
                 } else {
-                    // Unmapped: leave zero to avoid external aborts from speculation.
                 }
             }
         }
@@ -246,7 +245,6 @@ unsafe fn create_flat_mapping_4g_l3_pages() {
     manually_map(0x39b30);
     manually_map(0x3fbe0);
     manually_map(0x3e537);
-
     // let mut i = 0;
     // for pt in *&raw const L3 {
     //     dump_l3_entry(i, pt.0[0]);

@@ -1,3 +1,4 @@
+use crate::drivers::pl011::PL011;
 use crate::platform::aarch64::cpu;
 use crate::{UART0, UartSink};
 use alloc::string::String;
@@ -8,11 +9,11 @@ use core::ops::DerefMut;
 
 pub fn kernel_func() {
     // Runs at EL1
-    let x = 15;
+    let mut x = 15;
     let y = 13;
     let z = String::from("Hello World");
 
-    print_kernel_data(x, &y, &z);
+    print_kernel_data(&mut x, &y, &z);
 }
 
 unsafe extern "C" {
@@ -23,7 +24,7 @@ fn user_stack_top() -> usize {
     unsafe { &__stack_el0_top as *const _ as *const u8 as usize }
 }
 
-pub fn print_kernel_data(x: i32, y: &i32, z: &String) {
+pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
     let mut lock = UART0.lock();
 
     let _ = writeln!(
@@ -41,14 +42,18 @@ pub fn print_kernel_data(x: i32, y: &i32, z: &String) {
 
     let el0_sp: u64 = unsafe { &__stack_el0_top as *const _ as u64 };
     let user_fp: u64 = unsafe { user_func as *const () as u64 };
+    let x_ptr: u64 = x as *mut i32 as u64;
 
     let _ = writeln!(lock.deref_mut(), "CurrentEL: {}", cpu::current_el());
 
     drop(lock);
 
-    unsafe {
-        asm!(
-            "sub sp, sp, #272",
+    // TODO: We need to save CPSR/PSTATE flags here to.
+
+    loop {
+        unsafe {
+            asm!(
+            "sub sp, sp, #288",
 
             // store general purpose registers
             "stp x0, x1, [sp, #16 * 0]",
@@ -74,8 +79,11 @@ pub fn print_kernel_data(x: i32, y: &i32, z: &String) {
             "stp x0, x1, [sp, #16 * 15]",    // offset 240
 
             // LR (x30) and 8-byte padding to keep 16B alignment
-            "str x30, [sp, #16 * 16]",        // offset 256
-            "str xzr, [sp, #16 * 16 + 8]",    // pad to 272,
+            "adr x0, 1f",
+            "str x0, [sp, #16 * 16]",        // offset 256
+
+            // Store &mut x
+            "str {xptr}, [sp, #16 * 17]",
 
             // We've stored all registers, now lets go to EL0
             "msr SP_EL0, {el0_stack_top}",
@@ -86,15 +94,21 @@ pub fn print_kernel_data(x: i32, y: &i32, z: &String) {
             "isb",
             "eret",
 
+            "1:",
+
             el0_stack_top = in(reg) el0_sp,
             user_func_ptr = in(reg) user_fp,
-        )
+            xptr = in(reg) x_ptr,
+            );
+        }
+
+        // If you get here, we returned from EL0 via SVC and restored EL1 state.
+        let _ = writeln!(UartSink, "Back in kernel; x={x}, y={y}, z={z}");
+
+        for _ in 0..500_000 {
+            unsafe { asm!("nop") }
+        }
     }
-
-    unreachable!();
-
-    // If you get here, we returned from EL0 via SVC and restored EL1 state.
-    let _ = writeln!(UartSink, "Back in kernel; x={x}, y={y}, z={z}");
 }
 
 #[unsafe(no_mangle)]
@@ -106,77 +120,24 @@ pub fn user_func() {
     // Runs at EL0
     let x = 33;
     let y = 25;
-    let z = String::from("Adios World");
+    let z = "Adios World";
 
-    loop {
-        let _ = writeln!(
-            UartSink,
-            "\"{z}\", from user_func! x = {x}, y = {y} <> [EL0_STACK_TOP = {:x}]",
-            sp
-        );
+    // This really isn't great... Directly writing to MMIO from user-mode is kinda uncool :D
+    let mut uart = unsafe { PL011::new(0xFE201000) };
 
-        // let _ = writeln!(
-        //     UartSink,
-        //     "CurrentEL: {}",
-        //     crate::platform::aarch64::cpu::current_el()
-        // );
+    let _ = writeln!(
+        uart,
+        "\"{z}\", from user_func! x = {x}, y = {y} <> [EL0_STACK_TOP = {:x}]",
+        sp
+    );
 
-        for _ in 0..50_000_000 {
-            unsafe { asm!("nop") }
-        }
+    for _ in 0..500_000 {
+        unsafe { asm!("nop") }
     }
 
     // Trigger SVC to return to EL1
-    unsafe { asm!("svc #0x1234") };
+    unsafe { asm!("svc #0x10") };
 
-    // Not reached in this flow
-}
-
-// --- EL1/EL0 transition machinery ---
-
-// Save a compact EL1 context frame on SP_EL1 and eret to EL0.
-// Callee-saved only (x19..x29, LR), plus saved SP and a resume PC.
-#[inline(never)]
-pub unsafe fn switch_to_user(user_pc: u64, user_sp: u64) {
-    const FRAME_SIZE: usize = 0x70;
-    const OFF_SAVED_SP: usize = 0x00;
-    const OFF_X19: usize = 0x08;
-    const OFF_LR: usize = 0x60;
-    const OFF_RESUME_PC: usize = 0x68;
-
-    asm!(
-        // --- save EL1 callee-saved frame & set up EL0 ---
-        "sub     sp, sp, {frame}",
-        "add     x9, sp, {frame}",
-        "str     x9, [sp, {off_saved_sp}]",
-        "stp     x19, x20, [sp, {off_x19} + 16*0]",
-        "stp     x21, x22, [sp, {off_x19} + 16*1]",
-        "stp     x23, x24, [sp, {off_x19} + 16*2]",
-        "stp     x25, x26, [sp, {off_x19} + 16*3]",
-        "stp     x27, x28, [sp, {off_x19} + 16*4]",
-        "str     x29,      [sp, {off_x19} + 16*5]",
-        "str     x30, [sp, {off_lr}]",
-        "adr     x9, 1f",
-        "str     x9, [sp, {off_resume_pc}]",
-        "msr     sp_el0, {user_sp}",
-        "msr     elr_el1, {user_pc}",
-        "mov     x0, #0",          // EL0t; set DAIF as you need
-        "msr     spsr_el1, x0",
-        "isb",
-        "eret",                    // -> EL0 (never falls through)
-
-        // We come back here from the SVC handler via `ret x9`
-        "1:",
-        "ret",                     // return from switch_to_user to caller
-
-        frame = const FRAME_SIZE,
-        off_saved_sp = const OFF_SAVED_SP,
-        off_x19 = const OFF_X19,
-        off_lr  = const OFF_LR,
-        off_resume_pc = const OFF_RESUME_PC,
-        user_pc = in(reg) user_pc,
-        user_sp = in(reg) user_sp,
-        // DO NOT use `noreturn` here because we *do* return via label 1.
-        options()
-    );
+    unreachable!();
+    loop {}
 }
