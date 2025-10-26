@@ -1,8 +1,8 @@
-use crate::UartSink;
 use crate::drivers::common::readonly::ReadOnly;
 use crate::drivers::common::register::RegU32;
 use crate::drivers::common::writeonly::WriteOnly;
 use crate::hal::irq::{CpuTarget, InterruptController, InterruptGroup};
+use crate::{UartSink, kprintln};
 use bitflags::{Flags, bitflags};
 use core::fmt::Write;
 use core::ptr::{NonNull, addr_of, write_volatile};
@@ -247,16 +247,15 @@ impl GIC400 {
         }
     }
 
-    pub fn debug<W: Write>(&self, w: &mut W) {
+    pub fn debug(&self) {
         let d = self.gicd.as_ptr();
         let c = self.gicc.as_ptr();
 
-        let _ = writeln!(w, "\n\n================= GIC DEBUG =================");
+        kprintln!("\n\n================= GIC DEBUG =================");
 
         unsafe {
             let dctlr = (*d).ctlr.read();
-            let _ = writeln!(
-                w,
+            kprintln!(
                 "GICD_CTLR: 0x{:08x} (EnableGrp0={}, EnableGrp1={})",
                 dctlr,
                 dctlr & 1,
@@ -265,8 +264,7 @@ impl GIC400 {
 
             let isenabler0 = (*d).isenabler[0].read();
             let enabled = (isenabler0 >> PPI30_CNTPNSIRQ) & 1;
-            let _ = writeln!(
-                w,
+            kprintln!(
                 "INTID 30 enabled: {} (ISENABLER0=0x{:08x})",
                 enabled != 0,
                 isenabler0
@@ -274,11 +272,10 @@ impl GIC400 {
 
             let igroupr0 = (*d).igroupr[0].read();
             let group = (igroupr0 >> PPI30_CNTPNSIRQ) & 1;
-            let _ = writeln!(w, "INTID 30 group: {} (IGROUPR0=0x{:08x})", group, igroupr0);
+            kprintln!("INTID 30 group: {} (IGROUPR0=0x{:08x})", group, igroupr0);
 
             let cctlr = (*c).ctlr.read();
-            let _ = writeln!(
-                w,
+            kprintln!(
                 "GICC_CTLR: 0x{:08x} (EnableGrp0={}, EnableGrp1={}, EOImodeNS={})",
                 cctlr,
                 cctlr & 1,
@@ -287,18 +284,17 @@ impl GIC400 {
             );
 
             let pmr = (*c).pmr.read();
-            let _ = writeln!(w, "GICC_PMR: 0x{:02x}", pmr);
+            kprintln!("GICC_PMR: 0x{:02x}", pmr);
 
             let pending0 = (*d).ispendr[0].read();
             let timer_pending = (pending0 >> PPI30_CNTPNSIRQ) & 1;
-            let _ = writeln!(
-                w,
+            kprintln!(
                 "INTID 30 pending: {} (ISPENDR0=0x{:08x})",
                 timer_pending != 0,
                 pending0
             );
         }
 
-        let _ = writeln!(w, "==============================================\n\n");
+        kprintln!("==============================================\n\n");
     }
 }

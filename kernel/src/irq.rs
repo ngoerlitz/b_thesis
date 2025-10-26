@@ -1,10 +1,10 @@
-use crate::UART0;
 use crate::drivers::gic400::GIC400;
 use crate::exc_vec::ExceptionFrame;
 use crate::hal::driver::Driver;
 use crate::hal::irq::{CpuTarget, InterruptController, InterruptGroup};
 use crate::hal::timer::SystemTimer;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
+use crate::{UART0, kprintln};
 use core::fmt::{Display, Formatter, Write};
 use core::ops::DerefMut;
 
@@ -46,10 +46,8 @@ impl IRQHandler {
         let irq_num = iar & 0x3FF;
 
         {
-            let mut lock = UART0.lock();
             let core_id = cpu::cpuid();
-            let _ = writeln!(
-                lock.deref_mut(),
+            kprintln!(
                 "[ {} | {}::IRQ @ {} --> {} ]",
                 level,
                 core_id,
@@ -63,6 +61,10 @@ impl IRQHandler {
         }
 
         self.set_irq_end(iar);
+    }
+
+    pub(crate) fn get_callback(&self, irq_num: usize) -> Option<fn(&mut ExceptionFrame)> {
+        self.callback[irq_num]
     }
 
     pub(crate) fn inner(&self) -> &GIC400 {

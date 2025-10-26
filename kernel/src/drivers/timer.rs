@@ -1,5 +1,6 @@
 use crate::hal::driver::Driver;
 use crate::hal::timer::SystemTimer;
+use crate::kprintln;
 use crate::platform::aarch64::registers::cntfrq_el0::CNTFRQ_EL0;
 use crate::platform::aarch64::registers::cntp_ctl_el0::CNTP_CTL_EL0;
 use crate::platform::aarch64::registers::cntp_tval_el0::CNTP_TVAL_EL0;
@@ -60,29 +61,28 @@ impl EL1PhysicalTimer {
         let ctl = CNTPCT_EL0.read();
         let count = CNTPCT_EL0.read();
 
-        let _ = writeln!(w, "=== TIMER DEBUG ===");
-        let _ = writeln!(w, "Frequency: {} Hz", freq);
-        let _ = writeln!(
-            w,
+        kprintln!("=== TIMER DEBUG ===");
+        kprintln!("Frequency: {} Hz", freq);
+        kprintln!(
             "Control: 0b{:03b} (ENABLE={}, IMASK={}, ISTATUS={})",
             ctl,
             ctl & 1,
             (ctl >> 1) & 1,
             (ctl >> 2) & 1
         );
-        let _ = writeln!(w, "Current count: {}", count);
+        kprintln!("Current count: {}", count);
 
         // Check if timer is actually firing
         if (ctl >> 2) & 1 != 0 {
-            let _ = writeln!(w, "⚠️  Timer condition is MET (ISTATUS=1)");
+            kprintln!("⚠️  Timer condition is MET (ISTATUS=1)");
         } else {
-            let _ = writeln!(w, "✓  Timer condition not met (ISTATUS=0)");
+            kprintln!("✓  Timer condition not met (ISTATUS=0)");
         }
 
         if (ctl >> 1) & 1 != 0 {
-            let _ = writeln!(w, "⚠️  Timer interrupt is MASKED (IMASK=1)");
+            kprintln!("⚠️  Timer interrupt is MASKED (IMASK=1)");
         } else {
-            let _ = writeln!(w, "✓  Timer interrupt is UNMASKED (IMASK=0)");
+            kprintln!("✓  Timer interrupt is UNMASKED (IMASK=0)");
         }
     }
 }

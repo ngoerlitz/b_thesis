@@ -1,6 +1,6 @@
-use crate::UartSink;
 use crate::actor::root::actor_root_environment::{ActorRootEnvironment, ActorSpawnSpecification};
 use crate::ep_actor::{EntryPointActor, PrintActor};
+use crate::{UartSink, kprintln};
 use core::fmt::Write;
 use zcene_core::actor::{
     Actor, ActorCreateError, ActorEnvironment, ActorHandleError, ActorMessageSender,
@@ -19,7 +19,7 @@ where
         &mut self,
         context: <ActorRootEnvironment<H> as ActorEnvironment>::CreateContext,
     ) -> Result<(), ActorCreateError> {
-        let _ = writeln!(UartSink, "Spawned RootActor").unwrap();
+        kprintln!("Spawned RootActor");
 
         let print_addr = context
             .system

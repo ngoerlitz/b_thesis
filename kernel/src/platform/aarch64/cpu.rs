@@ -1,3 +1,4 @@
+use crate::platform::aarch64::cpu;
 use core::arch::asm;
 
 pub(crate) fn cpuid() -> u8 {
@@ -53,8 +54,45 @@ pub(crate) fn enable_irq() {
     }
 }
 
+#[inline(always)]
+pub(crate) fn read_daif() -> u64 {
+    let daif: u64;
+    unsafe {
+        asm!(
+            "mrs {0}, DAIF",
+            out(reg) daif,
+            options(nomem, preserves_flags)
+        );
+    }
+    daif
+}
+
+#[inline(always)]
+pub(crate) fn write_daif(daif: u64) {
+    unsafe {
+        asm!(
+            "msr DAIF, {0}",
+            in(reg) daif,
+            options(nomem, preserves_flags)
+        );
+    }
+}
+
 pub(crate) fn disable_irq() {
     unsafe {
         asm!("msr daifset, #0b111");
     }
+}
+
+// TODO: Move to helpers?
+pub(crate) fn with_irq_masked<F>(f: F)
+where
+    F: FnOnce(),
+{
+    let daif = cpu::read_daif();
+    cpu::disable_irq();
+
+    f();
+
+    cpu::write_daif(daif);
 }

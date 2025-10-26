@@ -1,5 +1,5 @@
-use crate::UartSink;
 use crate::actor::root::actor_root_environment::{ActorRootEnvironment, ActorSpawnSpecification};
+use crate::{UartSink, kprintln};
 use alloc::collections::btree_map::Entry;
 use alloc::string::String;
 use core::arch::asm;
@@ -28,7 +28,7 @@ where
         &mut self,
         context: <ActorRootEnvironment<H> as ActorEnvironment>::CreateContext,
     ) -> Result<(), ActorCreateError> {
-        let _ = writeln!(UartSink, "Spawned EntryPointActor").unwrap();
+        kprintln!("Spawned EntryPointActor");
 
         loop {
             self.channel.send("Hello!").await;
@@ -54,7 +54,7 @@ where
         &mut self,
         context: <ActorRootEnvironment<H> as ActorEnvironment>::CreateContext,
     ) -> Result<(), ActorCreateError> {
-        let _ = writeln!(UartSink, "Spawned PrintActor").unwrap();
+        kprintln!("Spawned PrintActor");
 
         Ok(())
     }
@@ -63,8 +63,7 @@ where
         &mut self,
         context: <ActorRootEnvironment<H> as ActorEnvironment>::HandleContext<Self::Message>,
     ) -> Result<(), ActorHandleError> {
-        let _ = writeln!(
-            UartSink,
+        kprintln!(
             "[CPU: {}] [PrintActor]: {:?}",
             crate::platform::aarch64::cpu::cpuid(),
             context.message()

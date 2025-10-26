@@ -4,6 +4,7 @@ use crate::hal::serial::{SerialDataBits, SerialDevice, SerialError, SerialParity
 use core::fmt::Write;
 use core::ptr::NonNull;
 
+const FR_RXFE_INDEX: usize = 4;
 const FR_TXFF_INDEX: usize = 5;
 const FR_RXFF_INDEX: usize = 6;
 
@@ -32,6 +33,15 @@ const LCRH_STP2: u32 = 1 << 3;
 const LCRH_EPS: u32 = 1 << 2;
 const LCRH_PEN: u32 = 1 << 1;
 const LCRH_BRK: u32 = 1 << 0;
+
+const IMSC_RXIM: u32 = 1 << 4;
+const IMSC_RTIM: u32 = 1 << 6;
+
+const MIS_RXMIS: u32 = 1 << 4;
+const MIS_RTMIS: u32 = 1 << 6;
+
+const ICR_RXIC: u32 = 1 << 4;
+const ICR_RTIC: u32 = 1 << 6;
 
 #[repr(C)]
 pub struct PL011Registers {
@@ -66,16 +76,22 @@ impl PL011 {
         }
     }
 
+    fn rx_fifo_empty(&self) -> bool {
+        let regs = self.base.as_ptr() as *const PL011Registers;
+
+        unsafe { (*regs).fr.read_bit(FR_RXFE_INDEX) }
+    }
+
     fn is_tx_fifo_full(&self) -> bool {
         let regs = self.base.as_ptr() as *const PL011Registers;
 
         unsafe { (*regs).fr.read_bit(FR_TXFF_INDEX) }
     }
 
-    fn is_rx_fifo_full(&self) -> bool {
+    fn mis(&self) -> u32 {
         let regs = self.base.as_ptr() as *const PL011Registers;
 
-        unsafe { (*regs).fr.read_bit(FR_RXFF_INDEX) }
+        unsafe { (*regs).mis.read() }
     }
 
     pub(crate) fn enable_interrupt(&mut self) {
@@ -83,8 +99,20 @@ impl PL011 {
 
         unsafe {
             (*regs).icr.write(0x7FF);
-            (*regs).imsc.write_bit(4, true);
+            let imsc = (*regs).imsc.read() | IMSC_RXIM | IMSC_RTIM;
+            (*regs).imsc.write(imsc);
         }
+    }
+
+    pub(crate) fn clear_rx_interrupts(&mut self) {
+        let regs = self.base.as_ptr();
+
+        unsafe { (*regs).icr.write(ICR_RXIC | ICR_RTIC) }
+    }
+
+    fn read_dr(&mut self) -> u8 {
+        let regs = self.base.as_ptr();
+        unsafe { (*regs).dr.read() as u8 }
     }
 }
 
@@ -184,18 +212,18 @@ impl SerialDevice for PL011 {
     fn read_byte(&mut self) -> Result<u8, SerialError> {
         let regs = self.base.as_ptr();
 
-        if self.is_rx_fifo_full() {
-            let mut char: u8;
-
-            unsafe {
-                char = (*regs).dr.read() as u8;
-                (*regs).icr.write_bit(4, true);
-            }
-
-            return Ok(char);
+        if self.rx_fifo_empty() {
+            return Err(SerialError::TODO);
         }
 
-        Err(SerialError::TODO)
+        let mut char: u8;
+
+        unsafe {
+            char = (*regs).dr.read() as u8;
+            (*regs).icr.write_bit(4, true);
+        }
+
+        Ok(char)
     }
 }
 

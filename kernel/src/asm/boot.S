@@ -3,8 +3,10 @@
 .extern __stack_01_el1_top
 .extern __stack_02_el1_top
 .extern __stack_03_el1_top
+.extern __mailbox_top
 
 .extern kernel_main
+.extern kernel_secondary
 .extern _el3
 
 .globl _start
@@ -47,11 +49,8 @@ _kmain:
     and     x0, x0, #3                  // x0 = core id 0..3
 
     cbz     x0, _core0
-    cmp     x0, #1
-    b.eq    _core1
-    cmp     x0, #2
-    b.eq    _core2
-    b       _core3                     // default: core 3
+    b _secondary_park
+
 
 _core0:
     ldr x1, =__stack_00_el1_top
@@ -59,37 +58,39 @@ _core0:
 
     b kernel_main
 
-_core1:
-    ldr x1, =__stack_01_el1_top
-    mov sp, x1
 
-    b _secondary_park
-
-_core2:
-    ldr x1, =__stack_02_el1_top
-    mov sp, x1
-
-    b _secondary_park
-
-_core3:
-    ldr x1, =__stack_03_el1_top
-    mov sp, x1
-
-    b _secondary_park
-
-.globl WAKEUP_FLAG
-.balign 8
-WAKEUP_FLAG:
-    .quad 0
+_never_wake_up:
+    wfe
+    b _never_wake_up
 
 _secondary_park:
-    sevl    // Clear event state
-1:
-    wfe     // Sleep until event
-    adrp x1, WAKEUP_FLAG
-    mov  x2, #1
-    ldr  x2, [x1, :lo12:WAKEUP_FLAG]
-    cbz  x2, 1b
-    dmb  ish
+    mrs x0, MPIDR_EL1
+    and x0, x0, #0xFF // x0 = core_aff (core_id)
 
-    b kernel_main
+    // x22 = &cpu_mailbox[]
+    adrp x22, __mailbox_top
+    add x22, x22, :lo12:__mailbox_top
+
+    // x21 = &cpu_mailbox[cpuid]
+    mov x1, #32        // sizeof(CpuMailbox)
+    mul x21, x0, x1
+    add x21, x22, x21   // __mailbox_top + core_id * sizeof(CpuMailbox)
+
+    wfe
+
+1:
+    ldr w2, [x21, #24] // mailbox[2] -> go_flag
+    cbz w2, 2f
+
+    ldr x3, [x21, #0]
+    mov sp, x3
+
+    ldr x1, [x21, #8]
+    ldr x0, [x21, #16]
+
+    dmb ish
+    br x1
+
+2:
+    wfe
+    b 1b

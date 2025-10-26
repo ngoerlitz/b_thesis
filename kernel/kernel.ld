@@ -20,6 +20,8 @@ __stack_03_el1_top = (__stack_00_el1_top - 3 * STACK_SIZE);
 __stack_el0_top    = (__stack_00_el1_top - 4 * STACK_SIZE);
 __stack_bottom = (__stack_el0_top & ~15);
 
+__mailbox_top = (__stack_bottom - 1 * STACK_SIZE);
+
 SECTIONS
 {
   /* Kernel image load address */
