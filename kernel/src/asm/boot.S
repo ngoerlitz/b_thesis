@@ -16,27 +16,6 @@
 _start:
     b _el3
 
-    // TODO: Read the .dtb pointer (x0) and store this in order to pass it to the
-    // TODO: kernel
-
-    // Check processor ID is zero (executing on main core), else hang
-    mrs     x1, mpidr_el1
-    and     x1, x1, #3
-    cbz     x1, 2f
-    // We're not on the main core, so hang in an infinite wait loop
-1:  wfe
-    b       1b
-2:  // We're on the main core!
-    // Set stack to start below our code
-
-    b _el3
-
-    // Jump to our main() routine in C (make sure it doesn't return)
-4:  bl      kernel_main
-    // In case it does return, halt the master core too
-    b       1b
-
-
 _kmain:
     /*
     * Jumps to the kernel entry point in Rust. This requires that we are in the correct

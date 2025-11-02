@@ -1,0 +1,254 @@
+use crate::drivers::pl011::PL011;
+use crate::hal::driver::Driver;
+use crate::kprintln;
+use core::arch::{asm, naked_asm};
+
+#[unsafe(no_mangle)]
+extern "C" fn el0_sys_write(user_buf: *const u8, len: usize) {
+    // Defensive cap to avoid unbounded spam if EL0 passes a huge length.
+    let mut remaining = core::cmp::min(len, 4096);
+
+    let mut p = user_buf;
+    let mut tmp = [0u8; 128];
+
+    while remaining != 0 {
+        let take = core::cmp::min(tmp.len(), remaining);
+        unsafe {
+            // Straight copy from user VA. If PAN is enabled and SPAN=0, this
+            // will fault; in that case, clear PAN around this call (see asm).
+            core::ptr::copy_nonoverlapping(p, tmp.as_mut_ptr(), take);
+            p = p.add(take);
+        }
+        remaining -= take;
+
+        // Try UTF-8; if not valid, print hex.
+        if let Ok(s) = core::str::from_utf8(&tmp[..take]) {
+            kprintln!("{}", s);
+        } else {
+            for &b in &tmp[..take] {
+                unimplemented!()
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+#[unsafe(naked)]
+#[rustfmt::skip]
+pub unsafe extern "C" fn el0_sync() -> ! {
+    // This also handles SVC -> therefore needed to handle EL0 -> EL1 transition
+
+    naked_asm!(
+        "mrs x9, ESR_EL1",
+        "ubfx x10, x9, #26, #6", // EC
+        "cmp x10, #0x15",
+        "b.ne el0_handler", // not SVC -> default handler
+        // noreturn
+
+        // Check for 0x20 -> uart_write
+        "and x11, x9, 0xFFFF",
+        "cmp x11, 0x20",
+        "b.ne 1f",
+        "sub sp, sp, #256",
+        "bl el0_sys_write",
+        "add sp, sp, #256",
+        "eret",
+
+        // Check for 0x10 -> EL0 -> EL1
+        "1:",
+        "and x11, x9, #0xFFFF",
+        "cmp x11, #0x10",
+        "b.ne el0_handler",
+        "ldr x0, [sp, #16 * 17]", // x2 = x_ptr
+        "ldr w3, [x0]",           // *x2
+        "add w3, w3, #1",
+        "str w3, [x0]",
+        "dsb ishst",
+        "isb",
+
+        // Restore registers
+        "ldp x2, x3,   [sp, #16 * 1]",
+        "ldp x4, x5,   [sp, #16 * 2]",
+        "ldp x6, x7,   [sp, #16 * 3]",
+        "ldp x8, x9,   [sp, #16 * 4]",
+        "ldp x10, x11, [sp, #16 * 5]",
+        "ldp x12, x13, [sp, #16 * 6]",
+        "ldp x14, x15, [sp, #16 * 7]",
+        "ldp x16, x17, [sp, #16 * 8]",
+        "ldp x18, x19, [sp, #16 * 9]",
+        "ldp x20, x21, [sp, #16 * 10]",
+        "ldp x22, x23, [sp, #16 * 11]",
+        "ldp x24, x25, [sp, #16 * 12]",
+        "ldp x26, x27, [sp, #16 * 13]",
+        "ldp x28, x29, [sp, #16 * 14]",
+        "ldr x30, [sp, #16 * 16]",
+        "mov x0, #(1<<9 | 1<<8 | 0<<7 | 1<<6 | 0b0101)", // DAIF = 1111, M=EL1h,
+        "msr SPSR_EL1, x0",
+        "msr ELR_EL1, x30",
+
+        // Since we clobbered x1 in the mov call above, we need to load them down here.
+        "ldp x0, x1,   [sp, #16 * 0]",
+        "add sp, sp, #288",
+
+        // Return
+        "eret",
+    )
+}
+
+const OFF_SAVED_SP: usize = 0x00;
+const OFF_X19: usize = 0x08;
+const OFF_LR: usize = 0x60;
+const OFF_RESUME_PC: usize = 0x68;
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn el0_handler() {
+    let mut uart = unsafe { PL011::new(0xFE201000) };
+
+    let _ = uart.enable();
+
+    let mut esr: u64;
+    let mut far: u64;
+    let mut elr: u64;
+    let mut spsr: u64;
+
+    asm!(
+    "mrs {esr},  esr_el1",
+    "mrs {far},  far_el1",
+    "mrs {elr},  elr_el1",
+    "mrs {spsr}, spsr_el1",
+    esr = out(reg) esr,
+    far = out(reg) far,
+    elr = out(reg) elr,
+    spsr = out(reg) spsr,
+    options(nomem, nostack, preserves_flags),
+    );
+
+    let ec = ((esr >> 26) & 0x3f) as u32;
+    let il = ((esr >> 25) & 0x1) != 0;
+    let iss = (esr & 0x01ff_ffff) as u32;
+
+    kprintln!("\n[EL0_SYNC] exception");
+    kprintln!("  ELR_EL1  = {:#018x}", elr);
+    kprintln!("  FAR_EL1  = {:#018x}", far);
+    kprintln!(
+        "  ESR_EL1  = {:#010x}  EC={:#04x}({}) IL={} ISS={:#08x}",
+        esr as u32,
+        ec,
+        ec_to_str(ec),
+        il as u8,
+        iss
+    );
+    kprintln!(
+        "  SPSR_EL1 = {:#018x}  NZCV={:04b}  D{} A{} I{} F{}  EL{}",
+        spsr,
+        ((spsr >> 28) & 0xF) as u8,
+        ((spsr >> 9) & 1),
+        ((spsr >> 8) & 1),
+        ((spsr >> 7) & 1),
+        ((spsr >> 6) & 1),
+        ((spsr >> 2) & 0b11)
+    );
+
+    match ec {
+        0x20 | 0x21 => {
+            // Instruction abort (lower/same EL)
+            let ifsc = iss & 0x3f;
+            let s1ptw = (iss >> 7) & 1;
+            let ea = (iss >> 9) & 1;
+            let fnv = (iss >> 10) & 1;
+            kprintln!(
+                "  InstAbort: IFSC={:#04x} ({}) S1PTW={} EA={} FnV={}",
+                ifsc,
+                fs_to_str(ifsc),
+                s1ptw,
+                ea,
+                fnv
+            );
+        }
+        0x24 | 0x25 => {
+            // Data abort (lower/same EL)
+            let dfsc = iss & 0x3f;
+            let wnr = (iss >> 6) & 1;
+            let s1ptw = (iss >> 7) & 1;
+            let cm = (iss >> 8) & 1;
+            let ea = (iss >> 9) & 1;
+            let fnv = (iss >> 10) & 1;
+            kprintln!(
+                "  DataAbort: DFSC={:#04x} ({}) WnR={} S1PTW={} CM={} EA={} FnV={}",
+                dfsc,
+                fs_to_str(dfsc),
+                wnr,
+                s1ptw,
+                cm,
+                ea,
+                fnv
+            );
+        }
+        0x15 => {
+            // SVC from EL0
+            let imm16 = iss & 0xffff;
+            kprintln!("  SVC: imm16={:#06x}", imm16);
+        }
+        0x35 => {
+            // BRK instruction
+            let imm16 = iss & 0xffff;
+            kprintln!("  BRK: imm16={:#06x}", imm16);
+        }
+        _ => { /* other ECs will still be visible via the raw ESR dump above */ }
+    }
+
+    // Optional: also dump the PTEs for ELR/FAR using your existing helper(s).
+    // dump_pte_for_va(elr as usize);
+    // dump_pte_for_va(far as usize);
+
+    // Halt here so you can read the output.
+    loop {
+        asm!("wfi", options(nomem, nostack, preserves_flags));
+    }
+}
+
+fn ec_to_str(ec: u32) -> &'static str {
+    match ec {
+        0x00 => "Unknown",
+        0x15 => "SVC (EL0)",
+        0x20 => "Instr abort (lower EL)",
+        0x21 => "Instr abort (same EL)",
+        0x24 => "Data abort (lower EL)",
+        0x25 => "Data abort (same EL)",
+        0x26 => "Alignment fault",
+        0x28 => "FP/AdvSIMD",
+        0x2C => "Breakpoint (lower EL)",
+        0x2D => "Breakpoint (same EL)",
+        0x30 => "Step (lower EL)",
+        0x31 => "Step (same EL)",
+        0x32 => "Watchpoint (lower EL)",
+        0x33 => "Watchpoint (same EL)",
+        0x35 => "BRK",
+        _ => "Other",
+    }
+}
+
+fn fs_to_str(fs: u32) -> &'static str {
+    match fs {
+        0x00 => "Addr size fault L0",
+        0x01 => "Addr size fault L1",
+        0x02 => "Addr size fault L2",
+        0x03 => "Addr size fault L3",
+        0x04 => "Translation fault L0",
+        0x05 => "Translation fault L1",
+        0x06 => "Translation fault L2",
+        0x07 => "Translation fault L3",
+        0x09 => "Access flag fault L1",
+        0x0A => "Access flag fault L2",
+        0x0B => "Access flag fault L3",
+        0x0D => "Permission fault L1",
+        0x0E => "Permission fault L2",
+        0x0F => "Permission fault L3",
+        0x10 => "Sync external abort",
+        0x11 => "Async SError",
+        0x14 => "TLB conflict",
+        0x15 => "Unsupported atomic",
+        0x21 => "Alignment fault",
+        _ => "Unclassified",
+    }
+}

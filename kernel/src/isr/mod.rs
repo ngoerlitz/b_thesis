@@ -1,3 +1,7 @@
+pub mod el;
+mod handlers;
+pub mod irq_manager;
+
 pub(crate) struct ExceptionFrame {
     pub x0: u64,
     pub x1: u64,
@@ -36,5 +40,3 @@ pub(crate) struct ExceptionFrame {
     pub x30: u64,
     pub _pad: u64,
 }
-
-extern "C" fn handle_el1_irq(frame: &mut ExceptionFrame) {}

@@ -36,7 +36,7 @@ where
 
     #[inline(always)]
     #[allow(unused)]
-    fn enable_bit(&mut self, idx: usize) {
+    pub fn enable_bit(&mut self, idx: usize) {
         debug_assert!(idx < size_of::<T>() * 8);
         let one = T::from(1u8);
         self.modify(|v| v | (one << idx));
@@ -44,7 +44,7 @@ where
 
     #[inline(always)]
     #[allow(unused)]
-    fn clear_bit(&mut self, idx: usize) {
+    pub fn clear_bit(&mut self, idx: usize) {
         debug_assert!(idx < size_of::<T>() * 8);
         let one = T::from(1u8);
         self.modify(|v| v & !(one << idx));
@@ -52,6 +52,7 @@ where
 
     #[inline(always)]
     #[allow(unused)]
+    #[deprecated = "Use enable-/clear bit directly!"]
     pub fn write_bit(&mut self, idx: usize, val: bool) {
         if val {
             self.enable_bit(idx)

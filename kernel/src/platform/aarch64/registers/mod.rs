@@ -1,8 +1,10 @@
-pub(crate) mod cntp_tval_el0;
 pub(crate) mod cntfrq_el0;
 pub(crate) mod cntp_ctl_el0;
 pub(crate) mod cntp_cval_el0;
+pub(crate) mod cntp_tval_el0;
 pub(crate) mod cntpct_el0;
+pub(crate) mod esr_el1;
+pub(crate) mod far_el1;
 
 #[macro_export]
 macro_rules! aarch64_read_write_system_reg {

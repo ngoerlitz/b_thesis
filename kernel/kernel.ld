@@ -30,14 +30,14 @@ SECTIONS
   /* Keep boot code */
   .init : {
     KEEP(*(.init))
-  } > SDRAM
+  } > SDRAM 
 
   /* ---- kernel text ---- */
   . = ALIGN(PAGE_SIZE);
   __text_start = .;
   .text : {
     *(.text .text.*)
-  } > SDRAM
+  } > SDRAM 
   __text_end = .;
 
   /* ---- read-only data ---- */
@@ -45,7 +45,7 @@ SECTIONS
   __rodata_start = .;
   .rodata : {
     *(.rodata .rodata.*)
-  } > SDRAM
+  } > SDRAM 
   __rodata_end = .;
 
   /* ---- kernel data ---- */
@@ -53,7 +53,7 @@ SECTIONS
   __data_start = .;
   .data : {
     *(.data .data.*)
-  } > SDRAM
+  } > SDRAM 
   __data_end = .;
 
   /* ---- kernel BSS ---- */
@@ -62,7 +62,7 @@ SECTIONS
   .bss (NOLOAD) : {
     *(.bss .bss.*)
     *(COMMON)
-  } > SDRAM
+  } > SDRAM 
   __bss_end = .;
 
     /* ---- user text (run at EL0) ----
@@ -72,7 +72,7 @@ SECTIONS
       __user_text_start = .;
       .user_text : {
         KEEP(*(.user_text .user_text.*))
-      } > SDRAM
+      } > SDRAM 
       __user_text_end = .;
 
   /* ---- heap ---- */
