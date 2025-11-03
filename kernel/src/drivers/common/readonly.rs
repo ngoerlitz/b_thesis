@@ -3,7 +3,7 @@ use crate::drivers::common::register::Register;
 use core::ops::Deref;
 
 #[repr(transparent)]
-pub(crate) struct ReadOnly<R>(R);
+pub struct ReadOnly<R>(R);
 
 impl<T> ReadOnly<Register<T>>
 where

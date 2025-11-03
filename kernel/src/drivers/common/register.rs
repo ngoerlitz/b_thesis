@@ -1,7 +1,7 @@
 use crate::drivers::common::RegisterCommonBounds;
 
 #[repr(transparent)]
-pub(crate) struct Register<T> {
+pub struct Register<T> {
     value: T,
 }
 
@@ -11,26 +11,26 @@ where
 {
     #[inline(always)]
     #[allow(unused)]
-    pub(crate) fn read(&self) -> T {
+    pub fn read(&self) -> T {
         unsafe { core::ptr::read_volatile(&self.value) }
     }
 
     #[inline(always)]
     #[allow(unused)]
-    pub(crate) fn write(&mut self, value: T) {
+    pub fn write(&mut self, value: T) {
         unsafe { core::ptr::write_volatile(&mut self.value, value) }
     }
 
     #[inline(always)]
     #[allow(unused)]
-    pub(crate) fn modify(&mut self, f: impl FnOnce(T) -> T) {
+    pub fn modify(&mut self, f: impl FnOnce(T) -> T) {
         let curr = self.read();
         self.write(f(curr));
     }
 
     #[inline(always)]
     #[allow(unused)]
-    pub(crate) fn zero(&mut self) {
+    pub fn zero(&mut self) {
         self.write(T::from(0u8));
     }
 
@@ -63,7 +63,7 @@ where
 
     #[inline(always)]
     #[allow(unused)]
-    pub(crate) fn read_bit(&self, idx: usize) -> bool {
+    pub fn read_bit(&self, idx: usize) -> bool {
         debug_assert!(idx < size_of::<T>() * 8);
         let one = T::from(1u8);
         ((self.read() >> idx) & one) == one

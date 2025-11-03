@@ -4,7 +4,7 @@ use crate::drivers::common::writeonly::WriteOnly;
 use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, InterruptGroup, IrqDriver, IrqType};
-use crate::{UartSink, bsp, kprintln};
+use crate::{bsp, kprintln};
 use bitflags::{Flags, bitflags};
 use core::cell::UnsafeCell;
 use core::fmt::{Debug, Display, Formatter, Write};
@@ -166,14 +166,6 @@ impl GIC400 {
 }
 
 impl GIC400 {
-    fn calculate_word_idx_shift(intid: u32) -> (usize, u32) {
-        ((intid / 32) as usize, 1u32 << (intid % 32))
-    }
-
-    fn calculate_idx_shift(intid: u32) -> (usize, u32) {
-        ((intid / 4) as usize, ((intid % 4) * 8))
-    }
-
     pub fn init(&mut self) {
         let gicd = self.gicd.as_ptr();
         let gicc = self.gicc.as_ptr();
@@ -311,64 +303,67 @@ impl IrqDriver for GIC400 {
 
 impl Display for GIC400 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        use core::fmt::Write;
+
         let gicd = self.gicd.as_ptr();
         let gicc = self.gicc.as_ptr();
 
-        writeln!(f, "\n\n================= GIC DEBUG =================");
-
         let dctlr = unsafe { (*gicd).ctlr.read() };
-        writeln!(
-            f,
-            "GICD_CTLR: 0x{:08x} (EnableGrp0={}, EnableGrp1={})",
-            dctlr,
-            dctlr & 1,
-            (dctlr >> 1) & 1
-        );
-
-        let dctlr = unsafe { (*gicd).ctlr.read() };
-        writeln!(
-            f,
-            "GICD_CTLR: 0x{:08x} (EnableGrp0={}, EnableGrp1={})",
-            dctlr,
-            dctlr & 1,
-            (dctlr >> 1) & 1
-        );
-
         let isenabler0 = unsafe { (*gicd).isenabler[0].read() };
-        let enabled = (isenabler0 >> PPI30_CNTPNSIRQ) & 1;
-        writeln!(
-            f,
-            "INTID 30 enabled: {} (ISENABLER0=0x{:08x})",
-            enabled != 0,
-            isenabler0
-        );
-
+        let ispendr0 = unsafe { (*gicd).ispendr[0].read() };
+        let isactiver0 = unsafe { (*gicd).isactiver[0].read() };
         let igroupr0 = unsafe { (*gicd).igroupr[0].read() };
-        let group = (igroupr0 >> PPI30_CNTPNSIRQ) & 1;
-        writeln!(f, "INTID 30 group: {} (IGROUPR0=0x{:08x})", group, igroupr0);
 
+        // ---- CPU Interface ----
         let cctlr = unsafe { (*gicc).ctlr.read() };
-        writeln!(
-            f,
-            "GICC_CTLR: 0x{:08x} (EnableGrp0={}, EnableGrp1={}, EOImodeNS={})",
-            cctlr,
-            cctlr & 1,
-            (cctlr >> 1) & 1,
-            (cctlr >> 9) & 1
-        );
-
         let pmr = unsafe { (*gicc).pmr.read() };
-        writeln!(f, "GICC_PMR: 0x{:02x}", pmr);
 
-        let pending0 = unsafe { (*gicd).ispendr[0].read() };
-        let timer_pending = (pending0 >> PPI30_CNTPNSIRQ) & 1;
+        const INTID: u32 = PPI30_CNTPNSIRQ as u32;
+
+        let enabled = ((isenabler0 >> INTID) & 1) != 0;
+        let pending = ((ispendr0 >> INTID) & 1) != 0;
+        let active = ((isactiver0 >> INTID) & 1) != 0;
+        let group = ((igroupr0 >> INTID) & 1) as u8;
+
+        let d_en_g0 = (dctlr & (1 << 0)) != 0;
+        let d_en_g1 = (dctlr & (1 << 1)) != 0;
+
+        let c_en_g0 = (cctlr & (1 << 0)) != 0;
+        let c_en_g1 = (cctlr & (1 << 1)) != 0;
+        let c_eoim_ns = (cctlr & (1 << 9)) != 0;
+
+        writeln!(f, "================= GIC-400 DEBUG ================");
+
+        writeln!(f, " Distributor:");
+        writeln!(f, "   CTLR         : 0x{dctlr:08x}");
+        writeln!(f, "     EnableGrp0 : {}", if d_en_g0 { 1 } else { 0 });
+        writeln!(f, "     EnableGrp1 : {}", if d_en_g1 { 1 } else { 0 });
+        writeln!(f, "   ISENABLER0   : 0x{isenabler0:08x}");
+        writeln!(f, "   ISPENDR0     : 0x{ispendr0:08x}");
+        writeln!(f, "   ISACTIVER0   : 0x{isactiver0:08x}");
+        writeln!(f, "   IGROUPR0     : 0x{igroupr0:08x}");
+        writeln!(f);
+
+        writeln!(f, " CPU Interface:");
+        writeln!(f, "   CTLR         : 0x{cctlr:08x}");
+        writeln!(f, "     EnableGrp0 : {}", if c_en_g0 { 1 } else { 0 });
+        writeln!(f, "     EnableGrp1 : {}", if c_en_g1 { 1 } else { 0 });
+        writeln!(f, "     EOImodeNS  : {}", if c_eoim_ns { 1 } else { 0 });
+        writeln!(f, "   PMR          : 0x{pmr:02x}");
+        writeln!(f);
+
+        writeln!(f, " INTID {INTID}:");
+        writeln!(f, "   enabled      : {}", enabled);
         writeln!(
             f,
-            "INTID 30 pending: {} (ISPENDR0=0x{:08x})",
-            timer_pending != 0,
-            pending0
+            "   group        : {} {}",
+            group,
+            if group == 0 { "(Group0)" } else { "(Group1)" }
         );
+        writeln!(f, "   pending      : {}", pending);
+        writeln!(f, "   active       : {}", active);
+        writeln!(f, "===============================================");
 
-        writeln!(f, "==============================================\n\n")
+        Ok(())
     }
 }

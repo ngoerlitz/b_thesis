@@ -2,7 +2,7 @@ use crate::hal::driver::Driver;
 use bitflags::bitflags;
 
 bitflags! {
-    pub(crate) struct CpuTarget: u8 {
+    pub struct CpuTarget: u8 {
         const Zero  = 0b00000001;
         const One   = 0b00000010;
         const Two   = 0b00000100;
@@ -45,7 +45,7 @@ impl From<IrqType> for usize {
     }
 }
 
-pub(crate) enum InterruptGroup {
+pub enum InterruptGroup {
     Zero,
     One,
 }

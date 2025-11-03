@@ -1,7 +1,7 @@
 use crate::platform::aarch64::cpu;
 use core::arch::asm;
 
-pub(crate) fn cpuid() -> u8 {
+pub fn cpuid() -> u8 {
     let mpidr_el1: u64;
     unsafe {
         asm!("mrs {mpidr_el1}, mpidr_el1", mpidr_el1 = out(reg) mpidr_el1, options(nostack, preserves_flags));
@@ -10,7 +10,7 @@ pub(crate) fn cpuid() -> u8 {
     (mpidr_el1 & 0x3) as u8
 }
 
-pub(crate) fn current_el() -> &'static str {
+pub fn current_el() -> &'static str {
     let mut el: u8;
     unsafe {
         asm!("mrs {el}, CurrentEL", el = out(reg) el);
@@ -26,7 +26,7 @@ pub(crate) fn current_el() -> &'static str {
 }
 
 /// Wakes all cores currently waiting for an event (WFE)
-pub(crate) fn wake_secondary_cores() {
+pub fn wake_secondary_cores() {
     unsafe {
         asm!(
             "adrp x1, WAKEUP_FLAG",
@@ -39,7 +39,7 @@ pub(crate) fn wake_secondary_cores() {
     }
 }
 
-pub(crate) fn get_sp() -> u64 {
+pub fn get_sp() -> u64 {
     let sp: u64;
     unsafe {
         asm!("mov {}, sp", out(reg) sp, options(nostack, preserves_flags));
@@ -48,14 +48,14 @@ pub(crate) fn get_sp() -> u64 {
     sp
 }
 
-pub(crate) fn enable_irq() {
+pub fn enable_irq() {
     unsafe {
         asm!("msr daifclr, #0b111");
     }
 }
 
 #[inline(always)]
-pub(crate) fn read_daif() -> u64 {
+pub fn read_daif() -> u64 {
     let daif: u64;
     unsafe {
         asm!(
@@ -68,7 +68,19 @@ pub(crate) fn read_daif() -> u64 {
 }
 
 #[inline(always)]
-pub(crate) fn write_daif(daif: u64) {
+pub fn mask_daif_all() {
+    unsafe {
+        // Mask Debug, SError, IRQ, FIQ (set DAIF bits)
+        asm!(
+            "msr daifset, #0b1111",
+            "isb",
+            options(nostack, preserves_flags)
+        );
+    }
+}
+
+#[inline(always)]
+pub fn write_daif(daif: u64) {
     unsafe {
         asm!(
             "msr DAIF, {0}",
@@ -78,14 +90,14 @@ pub(crate) fn write_daif(daif: u64) {
     }
 }
 
-pub(crate) fn disable_irq() {
+pub fn disable_irq() {
     unsafe {
         asm!("msr daifset, #0b111");
     }
 }
 
 // TODO: Move to helpers?
-pub(crate) fn with_irq_masked<F>(f: F)
+pub fn with_irq_masked<F>(f: F)
 where
     F: FnOnce(),
 {

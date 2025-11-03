@@ -1,4 +1,4 @@
-pub(crate) mod pl011;
-pub(crate) mod gic400;
-pub(crate) mod timer;
 mod common;
+pub mod gic400;
+pub mod pl011;
+pub mod timer;

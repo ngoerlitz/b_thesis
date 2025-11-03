@@ -1,5 +1,5 @@
 #[allow(non_snake_case)]
-pub(crate) mod FAR_EL1 {
+pub mod FAR_EL1 {
     use crate::aarch64_read_write_system_reg;
     use core::arch::asm;
 
@@ -10,4 +10,4 @@ pub(crate) mod FAR_EL1 {
     }
 }
 
-pub(crate) static FAR_EL1: FAR_EL1::Register = FAR_EL1::Register {};
+pub static FAR_EL1: FAR_EL1::Register = FAR_EL1::Register {};

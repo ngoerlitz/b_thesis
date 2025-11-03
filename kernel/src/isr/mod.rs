@@ -1,8 +1,7 @@
 pub mod el;
 mod handlers;
-pub mod irq_manager;
 
-pub(crate) struct ExceptionFrame {
+pub struct ExceptionFrame {
     pub x0: u64,
     pub x1: u64,
     pub x2: u64,

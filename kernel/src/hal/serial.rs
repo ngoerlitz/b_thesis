@@ -1,25 +1,26 @@
+use crate::hal::driver::Driver;
 use core::fmt::Write;
 
 #[derive(Debug)]
-pub(crate) enum SerialError {
+pub enum SerialError {
     TODO,
     TransmitBufferFull,
 }
 
-pub(crate) enum SerialParity {
+pub enum SerialParity {
     None,
     Even,
     Odd,
 }
 
-pub(crate) enum SerialDataBits {
+pub enum SerialDataBits {
     Five,
     Six,
     Seven,
     Eight,
 }
 
-pub(crate) trait SerialDevice: Write {
+pub trait SerialDriver: Driver + Write {
     /// Sets the baud rate for the target `SerialDevice`
     fn set_baud_rate(&mut self, uart_clk_hz: u32, baud: u32);
 

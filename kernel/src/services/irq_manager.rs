@@ -5,12 +5,12 @@ use crate::hal::irq_driver::{CpuTarget, InterruptGroup, IrqDriver, IrqType};
 use crate::isr::ExceptionFrame;
 use core::fmt::{Display, Formatter};
 
-pub struct IrqManager<T: IrqDriver, const N: usize> {
+pub struct IrqManagerService<T: IrqDriver, const N: usize> {
     driver: T,
     callback: [Option<fn(&mut ExceptionFrame)>; N],
 }
 
-impl<T: IrqDriver, const N: usize> IrqManager<T, N> {
+impl<T: IrqDriver, const N: usize> IrqManagerService<T, N> {
     pub const fn new(driver: T) -> Self {
         Self {
             driver,
@@ -35,13 +35,13 @@ impl<T: IrqDriver, const N: usize> IrqManager<T, N> {
     }
 }
 
-impl<T: IrqDriver, const N: usize> Display for IrqManager<T, N> {
+impl<T: IrqDriver, const N: usize> Display for IrqManagerService<T, N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "IRQ Manager [driver: {}]", T::NAME)
     }
 }
 
-impl<T: IrqDriver, const N: usize> InterruptController for IrqManager<T, N> {
+impl<T: IrqDriver, const N: usize> InterruptController for IrqManagerService<T, N> {
     fn enable_irq(&mut self, irq_type: IrqType, cpu: CpuTarget) {
         self.driver.enable_irq(irq_type, cpu);
     }

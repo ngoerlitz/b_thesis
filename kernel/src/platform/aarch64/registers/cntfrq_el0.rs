@@ -1,5 +1,5 @@
 #[allow(non_snake_case)]
-pub(crate) mod CNTFRQ_EL0 {
+pub mod CNTFRQ_EL0 {
     use crate::aarch64_read_write_system_reg;
     use core::arch::asm;
 
@@ -10,4 +10,4 @@ pub(crate) mod CNTFRQ_EL0 {
     }
 }
 
-pub(crate) static CNTFRQ_EL0: CNTFRQ_EL0::Register = CNTFRQ_EL0::Register {};
+pub static CNTFRQ_EL0: CNTFRQ_EL0::Register = CNTFRQ_EL0::Register {};

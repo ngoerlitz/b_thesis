@@ -3,6 +3,7 @@ use crate::hal::timer::SystemTimer;
 use crate::kprintln;
 use crate::platform::aarch64::registers::cntfrq_el0::CNTFRQ_EL0;
 use crate::platform::aarch64::registers::cntp_ctl_el0::CNTP_CTL_EL0;
+use crate::platform::aarch64::registers::cntp_cval_el0::CNTP_CVAL_EL0;
 use crate::platform::aarch64::registers::cntp_tval_el0::CNTP_TVAL_EL0;
 use crate::platform::aarch64::registers::cntpct_el0::CNTPCT_EL0;
 use core::fmt::{Display, Formatter, Write};
@@ -24,6 +25,7 @@ impl EL1PhysicalTimer {
 
     pub fn init(&mut self) {
         self.frq = Some(CNTFRQ_EL0.read());
+        CNTP_CTL_EL0.clear_bit(0);
     }
 
     fn get_timer_info(&self) -> (u64, u64) {
@@ -55,41 +57,6 @@ impl EL1PhysicalTimer {
     }
 }
 
-impl Display for EL1PhysicalTimer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        let freq = CNTFRQ_EL0.read();
-        let ctl = CNTPCT_EL0.read();
-        let count = CNTPCT_EL0.read();
-
-        writeln!(f, "=== TIMER DEBUG ===");
-        writeln!(f, "Frequency: {} Hz", freq);
-        writeln!(
-            f,
-            "Control: 0b{:03b} (ENABLE={}, IMASK={}, ISTATUS={})",
-            ctl,
-            ctl & 1,
-            (ctl >> 1) & 1,
-            (ctl >> 2) & 1
-        );
-        writeln!(f, "Current count: {}", count);
-
-        // Check if timer is actually firing
-        if (ctl >> 2) & 1 != 0 {
-            writeln!(f, "Timer condition is MET (ISTATUS=1)");
-        } else {
-            writeln!(f, "Timer condition not met (ISTATUS=0)");
-        }
-
-        if (ctl >> 1) & 1 != 0 {
-            writeln!(f, "Timer interrupt is MASKED (IMASK=1)");
-        } else {
-            writeln!(f, "Timer interrupt is UNMASKED (IMASK=0)");
-        }
-
-        Ok(())
-    }
-}
-
 impl SystemTimer for EL1PhysicalTimer {
     fn get_value(&self) -> u64 {
         CNTPCT_EL0.read()
@@ -111,5 +78,60 @@ impl Driver for EL1PhysicalTimer {
 
     fn disable(&mut self) {
         todo!()
+    }
+}
+
+impl Display for EL1PhysicalTimer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let freq = CNTFRQ_EL0.read(); // frequency (Hz)
+        let cnt = CNTPCT_EL0.read(); // current counter
+        let tval = CNTP_TVAL_EL0.read(); // remaining ticks (signed)
+        let cval = CNTP_CVAL_EL0.read(); // absolute compare value
+        let ctl = CNTP_CTL_EL0.read(); // control/flags
+
+        let enable = ctl & 1;
+        let imask = (ctl >> 1) & 1;
+        let istatus = (ctl >> 2) & 1;
+
+        writeln!(f, "================ EL1 TIMER DEBUG ================")?;
+        writeln!(f, " Frequency     : {} Hz", freq)?;
+        writeln!(f, " Control (raw) : 0b{:b}", ctl)?;
+        writeln!(f, " Current Count : {}", cnt)?;
+        writeln!(f, " CVAL          : {}", cval)?;
+        writeln!(f, " TVAL          : {}", tval as i64)?;
+        writeln!(f)?;
+        writeln!(f, " Flags:")?;
+        writeln!(
+            f,
+            "   ENABLE  = {}   {}",
+            enable,
+            if enable == 1 {
+                "(active)"
+            } else {
+                "(disabled)"
+            }
+        )?;
+        writeln!(
+            f,
+            "   IMASK   = {}   {}",
+            imask,
+            if imask == 1 {
+                "(interrupt masked)"
+            } else {
+                "(interrupt unmasked)"
+            }
+        )?;
+        writeln!(
+            f,
+            "   ISTATUS = {}   {}",
+            istatus,
+            if istatus == 1 {
+                "(condition met)"
+            } else {
+                "(condition not met)"
+            }
+        )?;
+        writeln!(f, "================================================")?;
+        Ok(())
     }
 }

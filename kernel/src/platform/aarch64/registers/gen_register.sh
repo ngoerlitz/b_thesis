@@ -15,7 +15,7 @@ echo $reg_name ">>" $file_name
 
 cat > "$file_name.rs" <<EOF
 #[allow(non_snake_case)]
-pub(crate) mod ${reg_name} {
+pub mod ${reg_name} {
     use crate::aarch64_read_write_system_reg;
     use core::arch::asm;
 
@@ -26,7 +26,7 @@ pub(crate) mod ${reg_name} {
     }
 }
 
-pub(crate) static ${reg_name}: ${reg_name}::Register = ${reg_name}::Register {};
+pub static ${reg_name}: ${reg_name}::Register = ${reg_name}::Register {};
 EOF
 
-sed -i "1i\pub(crate) mod $file_name;" mod.rs
+sed -i "1i\pub mod $file_name;" mod.rs

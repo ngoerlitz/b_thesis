@@ -1,10 +1,10 @@
 use core::ops::{BitAnd, BitOr, Not, Shl, Shr};
 
-pub(crate) mod readonly;
-pub(crate) mod register;
-pub(crate) mod writeonly;
+pub mod readonly;
+pub mod register;
+pub mod writeonly;
 
-pub(crate) trait RegisterCommonBounds<T>:
+pub trait RegisterCommonBounds<T>:
     Copy
     + From<u8>
     + PartialEq

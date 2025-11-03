@@ -1,5 +1,5 @@
-pub(crate) mod driver;
-pub(crate) mod irq;
+pub mod driver;
+pub mod irq;
 pub mod irq_driver;
-pub(crate) mod serial;
-pub(crate) mod timer;
+pub mod serial;
+pub mod timer;

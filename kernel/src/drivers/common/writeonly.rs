@@ -3,7 +3,7 @@ use crate::drivers::common::register::Register;
 use core::ops::{Deref, DerefMut};
 
 #[repr(transparent)]
-pub(crate) struct WriteOnly<R>(R);
+pub struct WriteOnly<R>(R);
 
 impl<T> WriteOnly<Register<T>>
 where

@@ -1,10 +1,11 @@
+use crate::boot::global::IRQ_MANAGER;
 use crate::drivers::gic400::GIC400;
 use crate::hal::irq::InterruptController;
 use crate::hal::timer::SystemTimer;
 use crate::isr::ExceptionFrame;
 use crate::isr::el::ExceptionLevel;
+use crate::kprintln;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::{IRQ_MANAGER, kprintln};
 
 #[unsafe(no_mangle)]
 extern "C" fn exc_irq(exception_frame: &mut ExceptionFrame) {

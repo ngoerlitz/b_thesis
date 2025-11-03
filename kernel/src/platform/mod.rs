@@ -1,1 +1,1 @@
-pub(crate) mod aarch64;
+pub mod aarch64;

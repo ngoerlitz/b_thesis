@@ -1,6 +1,6 @@
 use crate::drivers::common::register::RegU32;
 use crate::hal::driver::Driver;
-use crate::hal::serial::{SerialDataBits, SerialDevice, SerialError, SerialParity};
+use crate::hal::serial::{SerialDataBits, SerialDriver, SerialError, SerialParity};
 use core::fmt::Write;
 use core::ptr::NonNull;
 
@@ -70,9 +70,11 @@ pub struct PL011 {
 unsafe impl Send for PL011 {}
 
 impl PL011 {
-    pub const unsafe fn new(base: usize) -> Self {
-        Self {
-            base: NonNull::new_unchecked(base as *mut PL011Registers),
+    pub const fn new(base: usize) -> Self {
+        unsafe {
+            Self {
+                base: NonNull::new_unchecked(base as *mut PL011Registers),
+            }
         }
     }
 
@@ -94,7 +96,7 @@ impl PL011 {
         unsafe { (*regs).mis.read() }
     }
 
-    pub(crate) fn enable_interrupt(&mut self) {
+    pub fn enable_interrupt(&mut self) {
         let regs = self.base.as_ptr();
 
         unsafe {
@@ -104,7 +106,7 @@ impl PL011 {
         }
     }
 
-    pub(crate) fn clear_rx_interrupts(&mut self) {
+    pub fn clear_rx_interrupts(&mut self) {
         let regs = self.base.as_ptr();
 
         unsafe { (*regs).icr.write(ICR_RXIC | ICR_RTIC) }
@@ -126,7 +128,7 @@ impl Write for PL011 {
     }
 }
 
-impl SerialDevice for PL011 {
+impl SerialDriver for PL011 {
     fn set_baud_rate(&mut self, uart_clk_hz: u32, baud: u32) {
         assert_ne!(baud, 0);
 
@@ -220,7 +222,7 @@ impl SerialDevice for PL011 {
 
         unsafe {
             char = (*regs).dr.read() as u8;
-            (*regs).icr.write_bit(4, true);
+            (*regs).icr.enable_bit(4);
         }
 
         Ok(char)
@@ -245,7 +247,7 @@ impl Driver for PL011 {
         let regs = self.base.as_ptr();
 
         unsafe {
-            (*regs).cr.write_bit(0, false);
+            (*regs).cr.clear_bit(0);
         }
     }
 }
