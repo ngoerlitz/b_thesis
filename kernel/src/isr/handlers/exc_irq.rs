@@ -1,7 +1,7 @@
 use crate::boot::global::IRQ_MANAGER;
 use crate::drivers::gic400::GIC400;
 use crate::hal::irq::InterruptController;
-use crate::hal::timer::SystemTimer;
+use crate::hal::timer::SystemTimerDriver;
 use crate::isr::ExceptionFrame;
 use crate::isr::el::ExceptionLevel;
 use crate::kprintln;
@@ -19,7 +19,7 @@ extern "C" fn exc_irq(exception_frame: &mut ExceptionFrame) {
             "[ {} | {}::IRQ @ {} --> {} ]",
             ExceptionLevel::EL1,
             core_id,
-            get_cpu_timer().get_value(),
+            get_cpu_timer().now(),
             irq_num
         );
 

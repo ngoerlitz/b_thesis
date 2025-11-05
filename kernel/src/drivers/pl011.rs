@@ -1,3 +1,4 @@
+use crate::bsp;
 use crate::drivers::common::register::RegU32;
 use crate::hal::driver::Driver;
 use crate::hal::serial::{SerialDataBits, SerialDriver, SerialError, SerialParity};
@@ -118,6 +119,22 @@ impl PL011 {
     }
 }
 
+impl Default for PL011 {
+    fn default() -> Self {
+        let mut pl011 = unsafe {
+            Self {
+                base: NonNull::new_unchecked(bsp::constants::UART0_BASE as *mut PL011Registers),
+            }
+        };
+
+        pl011.set_baud_rate(26, 3);
+        pl011.set_parity(SerialParity::None);
+        pl011.set_data_bits(SerialDataBits::Eight);
+
+        pl011
+    }
+}
+
 impl Write for PL011 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         for c in s.chars() {
@@ -129,18 +146,14 @@ impl Write for PL011 {
 }
 
 impl SerialDriver for PL011 {
-    fn set_baud_rate(&mut self, uart_clk_hz: u32, baud: u32) {
-        assert_ne!(baud, 0);
-
-        let num = (uart_clk_hz as u64) * 4;
-        let den = baud as u64;
-
-        let bauddiv = (num + den / 2) * 4;
+    fn set_baud_rate(&mut self, ibrd: u32, fbrd: u32) {
+        assert_ne!(ibrd, 0);
+        assert_ne!(fbrd, 0);
 
         let regs = self.base.as_ptr();
         unsafe {
-            (*regs).ibrd.write((bauddiv / 64) as u32);
-            (*regs).fbrd.write((bauddiv % 64) as u32);
+            (*regs).ibrd.write(ibrd);
+            (*regs).fbrd.write(fbrd & 0x3F);
         }
     }
 
@@ -199,16 +212,6 @@ impl SerialDriver for PL011 {
 
         let regs = self.base.as_ptr();
         unsafe { (*regs).dr.write(byte as u32) };
-    }
-
-    fn try_write_byte(&mut self, byte: u8) -> Result<(), SerialError> {
-        if self.is_tx_fifo_full() {
-            return Err(SerialError::TransmitBufferFull);
-        };
-
-        let regs = self.base.as_ptr();
-        unsafe { (*regs).dr.write(byte as u32) };
-        Ok(())
     }
 
     fn read_byte(&mut self) -> Result<u8, SerialError> {

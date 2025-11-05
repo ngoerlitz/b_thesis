@@ -8,6 +8,7 @@ bitflags = { version = "2.9" }
 spin = { version = "0.10" }
 zcene-core = { git = "https://github.com/Stazer/zcene.git", branch = "main" }
 linked_list_allocator = { version = "0.10" }
+paste = { version = "1" }
 
 [features]
 default = ["board-rpi4b"]

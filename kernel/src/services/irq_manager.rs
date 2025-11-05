@@ -42,7 +42,7 @@ impl<T: IrqDriver, const N: usize> Display for IrqManagerService<T, N> {
 }
 
 impl<T: IrqDriver, const N: usize> InterruptController for IrqManagerService<T, N> {
-    fn enable_irq(&mut self, irq_type: IrqType, cpu: CpuTarget) {
+    fn enable_irq(&mut self, irq_type: IrqType, cpu: Option<CpuTarget>) {
         self.driver.enable_irq(irq_type, cpu);
     }
 

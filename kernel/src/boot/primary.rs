@@ -1,5 +1,8 @@
+use crate::actor::env::root::environment::RootEnvironment;
+use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
+use crate::actor::runtime::handler::RuntimeHandler;
 use crate::boot::allocator::init_heap;
-use crate::boot::global::IRQ_MANAGER;
+use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER};
 use crate::boot::secondary::kernel_secondary;
 use crate::boot::{CpuBootInformation, KSTACK_01_TOP, KSTACK_02_TOP, KSTACK_03_TOP, MAILBOX_TOP};
 use crate::drivers::pl011::PL011;
@@ -7,7 +10,6 @@ use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::services::logger::LoggerService;
 use crate::{bsp, kprintln};
 use alloc::sync::Arc;
 use core::arch::asm;
@@ -15,6 +17,7 @@ use core::fmt::{Debug, Formatter};
 use core::time::Duration;
 use core::{fmt, ptr};
 use spin::Mutex;
+use zcene_core::future::runtime::FutureRuntime;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -29,7 +32,7 @@ struct CpuMailbox {
 /// Note that QEMU does **NOT** emulate the `wfe` instruction and instead treats it as a `nop`.
 /// This means that any `wfe` is subsequently ignored and all loops building on this requirement
 /// are all busy-waited!
-pub unsafe fn write_mailbox_for_core(core_index: u8, sp: u64, arg0: u64) {
+pub fn write_mailbox_for_core(core_index: u8, sp: u64, arg0: u64) {
     let base = MAILBOX_TOP();
 
     let mailbox_addr = base + (core_index as usize) * core::mem::size_of::<CpuMailbox>();
@@ -43,7 +46,9 @@ pub unsafe fn write_mailbox_for_core(core_index: u8, sp: u64, arg0: u64) {
         go: 1u64,
     };
 
-    ptr::write_volatile(mbox_ptr, mbox_val);
+    unsafe {
+        ptr::write_volatile(mbox_ptr, mbox_val);
+    }
 }
 
 fn init_mailboxes() {
@@ -68,25 +73,19 @@ fn init_mailboxes() {
     }
 }
 
-unsafe fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
-    // 1. Top of this core's stack region
+fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
     let stack_top = get_core_stack(core_id) as usize;
 
-    // 2. Place CpuBootInformation at the very top
     let info_size = core::mem::size_of::<CpuBootInformation>();
     let info_base = stack_top - info_size;
 
-    // 3. Actually write it
-    core::ptr::write_volatile(info_base as *mut CpuBootInformation, info);
+    unsafe {
+        core::ptr::write_volatile(info_base as *mut CpuBootInformation, info);
+    }
 
-    // 4. Compute initial SP for the core
-    //    Go 16 bytes below info_base, then align down to 16.
     let tmp = info_base - 16;
     let sp_aligned = tmp & !0xFusize; // clear low 4 bits -> multiple of 16
 
-    // 5. Values to hand to the secondary core:
-    //    x0 = &CpuBootInformation
-    //    sp = aligned stack pointer
     (info_base as u64, sp_aligned as u64)
 }
 
@@ -95,23 +94,25 @@ pub extern "C" fn kernel_main() -> ! {
     init_heap();
     init_mailboxes();
 
-    let mut logger = LoggerService::new(PL011::new(bsp::constants::UART0_BASE));
-    logger.init();
+    let x = RootEnvironment::new(
+        FutureRuntime::new(RuntimeHandler::default()).unwrap(),
+        ActorRootLoggerService::new(PL011::default()),
+    );
 
-    let serial_device = unsafe { PL011::new(0xFE201000) };
-    let shared_device: Arc<Mutex<PL011>> = Arc::new(Mutex::new(serial_device));
+    unsafe {
+        ACTOR_ROOT_ENVIRONMENT
+            .get()
+            .as_mut()
+            .unwrap()
+            .write(x.into());
+    }
 
-    kprintln!("Hello World, kernel starting!");
+    kprintln!("[INFO] Kernel Initializing");
 
     {
         let mut irq = IRQ_MANAGER.write();
         irq.inner_mut().init();
-
-        irq.enable_irq(
-            IrqType::from(bsp::constants::IRQ_PHYS_TIMER),
-            CpuTarget::empty(),
-        );
-
+        irq.enable_irq(IrqType::from(bsp::constants::IRQ_PHYS_TIMER), None);
         irq.set_irq_handler(IrqType::from(bsp::constants::IRQ_PHYS_TIMER), |_| {
             kprintln!("Timer!");
 

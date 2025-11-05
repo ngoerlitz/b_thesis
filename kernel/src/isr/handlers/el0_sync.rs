@@ -1,6 +1,7 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
 use crate::kprintln;
+use crate::platform::aarch64::cpu;
 use core::arch::{asm, naked_asm};
 
 #[unsafe(no_mangle)]
@@ -101,7 +102,7 @@ const OFF_LR: usize = 0x60;
 const OFF_RESUME_PC: usize = 0x68;
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn el0_handler() {
+extern "C" fn el0_handler() {
     let mut uart = unsafe { PL011::new(0xFE201000) };
 
     let _ = uart.enable();
@@ -111,17 +112,19 @@ unsafe extern "C" fn el0_handler() {
     let mut elr: u64;
     let mut spsr: u64;
 
-    asm!(
-    "mrs {esr},  esr_el1",
-    "mrs {far},  far_el1",
-    "mrs {elr},  elr_el1",
-    "mrs {spsr}, spsr_el1",
-    esr = out(reg) esr,
-    far = out(reg) far,
-    elr = out(reg) elr,
-    spsr = out(reg) spsr,
-    options(nomem, nostack, preserves_flags),
-    );
+    unsafe {
+        asm!(
+            "mrs {esr},  esr_el1",
+            "mrs {far},  far_el1",
+            "mrs {elr},  elr_el1",
+            "mrs {spsr}, spsr_el1",
+            esr = out(reg) esr,
+            far = out(reg) far,
+            elr = out(reg) elr,
+            spsr = out(reg) spsr,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
 
     let ec = ((esr >> 26) & 0x3f) as u32;
     let il = ((esr >> 25) & 0x1) != 0;
@@ -197,13 +200,8 @@ unsafe extern "C" fn el0_handler() {
         _ => { /* other ECs will still be visible via the raw ESR dump above */ }
     }
 
-    // Optional: also dump the PTEs for ELR/FAR using your existing helper(s).
-    // dump_pte_for_va(elr as usize);
-    // dump_pte_for_va(far as usize);
-
-    // Halt here so you can read the output.
     loop {
-        asm!("wfi", options(nomem, nostack, preserves_flags));
+        cpu::wfi();
     }
 }
 

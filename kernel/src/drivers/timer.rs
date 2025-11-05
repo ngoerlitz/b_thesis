@@ -1,5 +1,5 @@
 use crate::hal::driver::Driver;
-use crate::hal::timer::SystemTimer;
+use crate::hal::timer::SystemTimerDriver;
 use crate::kprintln;
 use crate::platform::aarch64::registers::cntfrq_el0::CNTFRQ_EL0;
 use crate::platform::aarch64::registers::cntp_ctl_el0::CNTP_CTL_EL0;
@@ -57,8 +57,8 @@ impl EL1PhysicalTimer {
     }
 }
 
-impl SystemTimer for EL1PhysicalTimer {
-    fn get_value(&self) -> u64 {
+impl SystemTimerDriver for EL1PhysicalTimer {
+    fn now(&self) -> u64 {
         CNTPCT_EL0.read()
     }
 

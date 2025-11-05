@@ -8,4 +8,5 @@ pub fn get_cpu_timer() -> &'static mut EL1PhysicalTimer {
 }
 
 pub mod cpu;
+pub mod irq;
 pub mod registers;

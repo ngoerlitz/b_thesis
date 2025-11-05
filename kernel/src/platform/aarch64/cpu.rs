@@ -11,7 +11,7 @@ pub fn cpuid() -> u8 {
 }
 
 pub fn current_el() -> &'static str {
-    let mut el: u8;
+    let mut el: u64;
     unsafe {
         asm!("mrs {el}, CurrentEL", el = out(reg) el);
     }
@@ -90,21 +90,14 @@ pub fn write_daif(daif: u64) {
     }
 }
 
+pub fn wfi() {
+    unsafe {
+        asm!("wfi", options(nostack, nomem, preserves_flags));
+    }
+}
+
 pub fn disable_irq() {
     unsafe {
         asm!("msr daifset, #0b111");
     }
-}
-
-// TODO: Move to helpers?
-pub fn with_irq_masked<F>(f: F)
-where
-    F: FnOnce(),
-{
-    let daif = cpu::read_daif();
-    cpu::disable_irq();
-
-    f();
-
-    cpu::write_daif(daif);
 }

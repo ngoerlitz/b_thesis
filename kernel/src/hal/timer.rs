@@ -1,4 +1,4 @@
-pub trait SystemTimer {
-    fn get_value(&self) -> u64;
+pub trait SystemTimerDriver {
+    fn now(&self) -> u64;
     fn get_frequency(&self) -> u64;
 }

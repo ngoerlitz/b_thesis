@@ -23,10 +23,6 @@ where
     pub fn zero(&mut self) {
         self.0.zero();
     }
-
-    pub fn write_bit(&mut self, idx: usize, val: bool) {
-        self.0.write_bit(idx, val);
-    }
 }
 
 impl<T> Deref for WriteOnly<Register<T>> {

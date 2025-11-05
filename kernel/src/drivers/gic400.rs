@@ -228,7 +228,7 @@ impl Driver for GIC400 {
 }
 
 impl IrqDriver for GIC400 {
-    fn enable_irq(&mut self, irq_type: IrqType, cpu: CpuTarget) {
+    fn enable_irq(&mut self, irq_type: IrqType, cpu: Option<CpuTarget>) {
         let gicd = self.gicd.as_ptr();
         let gicc = self.gicc.as_ptr();
 
@@ -244,8 +244,10 @@ impl IrqDriver for GIC400 {
                 (*gicd).isenabler[0].enable_bit(idx);
             },
             IrqType::Spi(n) => unsafe {
+                assert!(cpu.is_some());
+
                 let idx = n as usize;
-                let cpubits: u32 = cpu.bits().into();
+                let cpubits: u32 = cpu.unwrap().bits().into();
 
                 let (n, offset, mask) = Self::compute_itargetsr_offset(idx);
                 (*gicd).itargetsr[n].modify(|v| (v & !(mask)) | (cpubits << offset));
