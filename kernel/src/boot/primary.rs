@@ -1,6 +1,7 @@
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
 use crate::actor::runtime::handler::RuntimeHandler;
+use crate::actor_test::RootActor;
 use crate::boot::allocator::init_heap;
 use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER};
 use crate::boot::secondary::kernel_secondary;
@@ -17,6 +18,7 @@ use core::fmt::{Debug, Formatter};
 use core::time::Duration;
 use core::{fmt, ptr};
 use spin::Mutex;
+use zcene_core::actor::{ActorEnvironmentSpawn, ActorEnvironmentSpawnable};
 use zcene_core::future::runtime::FutureRuntime;
 
 #[repr(C)]
@@ -135,6 +137,14 @@ pub extern "C" fn kernel_main() -> ! {
     }
 
     cpu::enable_irq();
+
+    let actor = RootActor::default();
+
+    let _ = RootEnvironment::get().spawn(actor).unwrap();
+
+    RootEnvironment::get().enter();
+
+    loop {}
 
     /*
         unsafe {

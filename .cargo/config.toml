@@ -6,6 +6,7 @@ linker = "aarch64-none-elf-ld"
 rustflags = [
     "-C", "link-arg=-Tkernel/kernel.ld",
     "-C", "link-arg=--gc-sections",
+    "-Z", "higher-ranked-assumptions"
 ]
 
 [expand]

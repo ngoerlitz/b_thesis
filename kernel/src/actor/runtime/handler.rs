@@ -18,8 +18,6 @@ impl FutureRuntimeHandler for RuntimeHandler {
     type Queue = FutureRuntimeConcurrentQueue<Self>;
     type Yielder = FutureRuntimeNoOperationYielder;
     type Waker = FutureRuntimeContinueWaker;
-    type Data = ();
-    type Specification = ();
 
     getter_assoc!(allocator);
     getter_assoc!(queue);
