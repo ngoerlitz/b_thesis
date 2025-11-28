@@ -1,7 +1,6 @@
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
 use crate::actor::runtime::handler::RuntimeHandler;
-use crate::actor_test::RootActor;
 use crate::boot::allocator::init_heap;
 use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER};
 use crate::boot::secondary::kernel_secondary;
@@ -18,7 +17,7 @@ use core::fmt::{Debug, Formatter};
 use core::time::Duration;
 use core::{fmt, ptr};
 use spin::Mutex;
-use zcene_core::actor::{ActorEnvironmentSpawn, ActorEnvironmentSpawnable};
+use zcene_core::actor::{Actor, ActorEnvironmentSpawn, ActorEnvironmentSpawnable};
 use zcene_core::future::runtime::FutureRuntime;
 
 #[repr(C)]
@@ -91,8 +90,9 @@ fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
     (info_base as u64, sp_aligned as u64)
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn kernel_main() -> ! {
+pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(
+    actor: A
+) {
     init_heap();
     init_mailboxes();
 
@@ -138,13 +138,9 @@ pub extern "C" fn kernel_main() -> ! {
 
     cpu::enable_irq();
 
-    let actor = RootActor::default();
-
     let _ = RootEnvironment::get().spawn(actor).unwrap();
 
     RootEnvironment::get().enter();
-
-    loop {}
 
     /*
         unsafe {

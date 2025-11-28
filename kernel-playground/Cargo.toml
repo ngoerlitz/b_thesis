@@ -1,0 +1,11 @@
+[package]
+name = "kernel-playground"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kernel = {path = "../kernel"}
+zcene-core = { git = "https://github.com/Stazer/zcene.git", branch = "main" }
+
+[build-dependencies]
+cc = "*"

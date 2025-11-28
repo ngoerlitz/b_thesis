@@ -37,6 +37,18 @@ macro_rules! linker_symbols {
     }
 }
 
+#[macro_export]
+macro_rules! bootstrap_system {
+    ($actor: expr) => {
+        #[unsafe(no_mangle)]
+        fn kernel_entry() {
+            kernel::boot::primary::kernel_main($actor);
+
+            loop {}
+        }
+    };
+}
+
 linker_symbols! {
     MAILBOX_TOP = __mailbox_top;
     KSTACK_01_TOP = __stack_01_el1_top;

@@ -9,13 +9,12 @@
 
 extern crate alloc;
 
-mod actor;
-mod actor_test;
-mod boot;
+pub mod actor;
+pub mod boot;
 mod bsp;
 mod drivers;
 mod hal;
 mod isr;
 mod platform;
 mod services;
-mod utils;
+pub mod utils;

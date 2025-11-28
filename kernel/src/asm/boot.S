@@ -5,7 +5,7 @@
 .extern __stack_03_el1_top
 .extern __mailbox_top
 
-.extern kernel_main
+.extern kernel_entry
 .extern kernel_secondary
 .extern _el3
 
@@ -35,7 +35,7 @@ _core0:
     ldr x1, =__stack_00_el1_top
     mov sp, x1
 
-    b kernel_main
+    b kernel_entry
 
 
 _never_wake_up:

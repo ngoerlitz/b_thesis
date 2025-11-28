@@ -1,9 +1,15 @@
-use crate::actor::env::root::environment::RootEnvironment;
-use crate::kprintln;
-use core::fmt::Write;
-use zcene_core::actor::{
-    Actor, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorFuture,
-};
+#![allow(unused, unused_variables)]
+#![feature(allocator_api)]
+#![feature(format_args_nl)]
+#![feature(sync_unsafe_cell)]
+#![feature(ptr_as_ref_unchecked)]
+#![feature(arbitrary_self_types)]
+#![no_std]
+#![no_main]
+
+use zcene_core::actor::{Actor, ActorEnvironment, ActorCreateError, ActorDestroyError};
+use kernel::actor::env::root::environment::RootEnvironment;
+use kernel::{bootstrap_system, kprintln};
 
 #[derive(Default)]
 pub struct RootActor;
@@ -18,7 +24,7 @@ impl Actor<RootEnvironment> for RootActor {
         &'a mut self,
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
-        kprintln!("Hello World!");
+        kprintln!("This is a test of the new actor system. Please tell me this thing works!");
 
         Ok(())
     }
@@ -31,3 +37,5 @@ impl Actor<RootEnvironment> for RootActor {
         Ok(())
     }
 }
+
+bootstrap_system!(RootActor::default());
