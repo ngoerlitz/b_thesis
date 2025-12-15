@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/kernel-derive/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/kernel/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/zcene-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/kernel-playground/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/kernel/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

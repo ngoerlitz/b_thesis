@@ -1,100 +1,172 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
+use crate::isr::{EL1Context, ISRContext};
 use crate::kprintln;
 use crate::platform::aarch64::cpu;
 use core::arch::{asm, naked_asm};
+use core::ptr::addr_of;
+use core::slice;
 
 #[unsafe(no_mangle)]
-extern "C" fn el0_sys_write(user_buf: *const u8, len: usize) {
+unsafe extern "C" fn el0_sys_write(ctx: *const ISRContext) {
     // Defensive cap to avoid unbounded spam if EL0 passes a huge length.
-    let mut remaining = core::cmp::min(len, 4096);
 
-    let mut p = user_buf;
-    let mut tmp = [0u8; 128];
-
-    while remaining != 0 {
-        let take = core::cmp::min(tmp.len(), remaining);
-        unsafe {
-            // Straight copy from user VA. If PAN is enabled and SPAN=0, this
-            // will fault; in that case, clear PAN around this call (see asm).
-            core::ptr::copy_nonoverlapping(p, tmp.as_mut_ptr(), take);
-            p = p.add(take);
-        }
-        remaining -= take;
-
-        // Try UTF-8; if not valid, print hex.
-        if let Ok(s) = core::str::from_utf8(&tmp[..take]) {
-            kprintln!("{}", s);
-        } else {
-            for &b in &tmp[..take] {
-                unimplemented!()
-            }
-        }
+    unsafe {
+        let slice = slice::from_raw_parts((*ctx).x0 as *const u8, (*ctx).x1 as usize);
+        kprintln!("User: {}", str::from_utf8_unchecked(slice));
     }
 }
 
 #[unsafe(no_mangle)]
-#[unsafe(naked)]
-#[rustfmt::skip]
-pub unsafe extern "C" fn el0_sync() -> ! {
-    // This also handles SVC -> therefore needed to handle EL0 -> EL1 transition
-
-    naked_asm!(
-        "mrs x9, ESR_EL1",
-        "ubfx x10, x9, #26, #6", // EC
-        "cmp x10, #0x15",
-        "b.ne el0_handler", // not SVC -> default handler
-        // noreturn
-
-        // Check for 0x20 -> uart_write
-        "and x11, x9, 0xFFFF",
-        "cmp x11, 0x20",
-        "b.ne 1f",
-        "sub sp, sp, #256",
-        "bl el0_sys_write",
-        "add sp, sp, #256",
-        "eret",
-
-        // Check for 0x10 -> EL0 -> EL1
-        "1:",
-        "and x11, x9, #0xFFFF",
-        "cmp x11, #0x10",
-        "b.ne el0_handler",
-        "ldr x0, [sp, #16 * 17]", // x2 = x_ptr
-        "ldr w3, [x0]",           // *x2
-        "add w3, w3, #1",
-        "str w3, [x0]",
-        "dsb ishst",
-        "isb",
-
-        // Restore registers
-        "ldp x2, x3,   [sp, #16 * 1]",
-        "ldp x4, x5,   [sp, #16 * 2]",
-        "ldp x6, x7,   [sp, #16 * 3]",
-        "ldp x8, x9,   [sp, #16 * 4]",
-        "ldp x10, x11, [sp, #16 * 5]",
-        "ldp x12, x13, [sp, #16 * 6]",
-        "ldp x14, x15, [sp, #16 * 7]",
-        "ldp x16, x17, [sp, #16 * 8]",
-        "ldp x18, x19, [sp, #16 * 9]",
-        "ldp x20, x21, [sp, #16 * 10]",
-        "ldp x22, x23, [sp, #16 * 11]",
-        "ldp x24, x25, [sp, #16 * 12]",
-        "ldp x26, x27, [sp, #16 * 13]",
-        "ldp x28, x29, [sp, #16 * 14]",
-        "ldr x30, [sp, #16 * 16]",
-        "mov x0, #(1<<9 | 1<<8 | 0<<7 | 1<<6 | 0b0101)", // DAIF = 1111, M=EL1h,
-        "msr SPSR_EL1, x0",
-        "msr ELR_EL1, x30",
-
-        // Since we clobbered x1 in the mov call above, we need to load them down here.
-        "ldp x0, x1,   [sp, #16 * 0]",
-        "add sp, sp, #288",
-
-        // Return
-        "eret",
-    )
+extern "C" fn print_test(val: u64) -> ! {
+    kprintln!("Val: {:X}", val);
+    loop {}
 }
+
+const EC_SVC64: u64 = 0x15;
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Context) {
+    // Read ESR_EL1
+    let esr: u64;
+    asm!(
+        "mrs {0}, ESR_EL1",
+        out(reg) esr,
+        options(nomem, preserves_flags, nostack),
+    );
+
+    let ec = (esr >> 26) & 0x3f;
+
+    if ec != EC_SVC64 {
+        el0_handler();
+    }
+
+    let svc_num = (esr & 0xffff) as u16;
+
+    kprintln!("SVC: {}", svc_num);
+
+    match svc_num {
+        0x20 => {
+            el0_sys_write(ctx);
+        }
+        0x10 => {
+            //
+            // kprintln!("CTX: {:X} | CTX_EL1: {:X}", ctx as u64, ctx_el1 as u64);
+            //
+            let mut x: *mut i32 = (*ctx_el1).xptr as *mut i32;
+
+            kprintln!("Pointer: {:X} | Value: {}", x as u64, x.read_volatile());
+
+            *x += 1;
+
+            let mut y: u64 = 0;
+            asm!(
+            "ldr {}, [{}, #16 * 16]" // x2 = x_ptr
+            , out(reg) y, in(reg) ctx_el1, options(nostack, preserves_flags));
+
+            kprintln!("RETURN_ADDR: 0x{:x}", (y));
+
+            asm!(
+                "ldp x2, x3,   [x1, #16 * 1]",
+                "ldp x4, x5,   [x1, #16 * 2]",
+                "ldp x6, x7,   [x1, #16 * 3]",
+                "ldp x8, x9,   [x1, #16 * 4]",
+                "ldp x10, x11, [x1, #16 * 5]",
+                "ldp x12, x13, [x1, #16 * 6]",
+                "ldp x14, x15, [x1, #16 * 7]",
+                "ldp x16, x17, [x1, #16 * 8]",
+                "ldp x18, x19, [x1, #16 * 9]",
+                "ldp x20, x21, [x1, #16 * 10]",
+                "ldp x22, x23, [x1, #16 * 11]",
+                "ldp x24, x25, [x1, #16 * 12]",
+                "ldp x26, x27, [x1, #16 * 13]",
+                "ldp x28, x29, [x1, #16 * 14]",
+
+                "mov x0, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",   // D A I F + EL1h
+                "msr SPSR_EL1, x0",
+
+                "ldr x30, [x1, #16 * 16]",
+                "msr ELR_EL1, x30",
+
+                "ldr x30, [x1, #16 * 17]",
+                "ldp x0, x1, [sp, #16 * 0]",
+
+                "mov sp, x30",
+                "eret",
+
+                in("x1") (ctx_el1 as u64),
+                options(noreturn),
+            );
+        }
+        _ => {
+            el0_handler();
+        }
+    }
+}
+//
+// #[unsafe(no_mangle)]
+// #[unsafe(naked)]
+// #[rustfmt::skip]
+// pub unsafe extern "C" fn el0_sync() -> ! {
+//     // This also handles SVC -> therefore needed to handle EL0 -> EL1 transition
+//
+//     naked_asm!(
+//         "msr DAIFSet, #0b1111",
+//         "mrs x9, ESR_EL1",
+//         "ubfx x10, x9, #26, #6", // EC
+//         "cmp x10, #0x15",
+//         "b.ne el0_handler", // not SVC -> default handler
+//         // noreturn
+//
+//         // Check for 0x20 -> uart_write
+//         "and x11, x9, 0xFFFF",
+//         "cmp x11, 0x20",
+//         "b.ne 1f",
+//         "sub sp, sp, #256",
+//         "bl el0_sys_write",
+//         "add sp, sp, #256",
+//         "eret",
+//
+//         // Check for 0x10 -> EL0 -> EL1
+//         "1:",
+//         "and x11, x9, #0xFFFF",
+//         "cmp x11, #0x10",
+//         "b.ne el0_handler",
+//         "ldr x0, [sp, #16 * 17]", // x2 = x_ptr
+//         "ldr w3, [x0]",           // *x2
+//         "add w3, w3, #1",
+//         "str w3, [x0]",
+//         "dsb ishst",
+//         "isb",
+//
+//         // Restore registers
+//         "ldp x2, x3,   [sp, #16 * 1]",
+//         "ldp x4, x5,   [sp, #16 * 2]",
+//         "ldp x6, x7,   [sp, #16 * 3]",
+//         "ldp x8, x9,   [sp, #16 * 4]",
+//         "ldp x10, x11, [sp, #16 * 5]",
+//         "ldp x12, x13, [sp, #16 * 6]",
+//         "ldp x14, x15, [sp, #16 * 7]",
+//         "ldp x16, x17, [sp, #16 * 8]",
+//         "ldp x18, x19, [sp, #16 * 9]",
+//         "ldp x20, x21, [sp, #16 * 10]",
+//         "ldp x22, x23, [sp, #16 * 11]",
+//         "ldp x24, x25, [sp, #16 * 12]",
+//         "ldp x26, x27, [sp, #16 * 13]",
+//         "ldp x28, x29, [sp, #16 * 14]",
+//         "ldr x30, [sp, #16 * 16]",
+//         "mov x0, #(1<<9 | 1<<8 | 0<<7 | 1<<6 | 0b0101)", // DAIF = 1111, M=EL1h,
+//         "msr SPSR_EL1, x0",
+//         "msr ELR_EL1, x30",
+//
+//         // Since we clobbered x1 in the mov call above, we need to load them down here.
+//         "ldp x0, x1,   [sp, #16 * 0]",
+//         "add sp, sp, #288",
+//
+//         // Return
+//         "eret",
+//     )
+// }
 
 const OFF_SAVED_SP: usize = 0x00;
 const OFF_X19: usize = 0x08;
@@ -114,15 +186,15 @@ extern "C" fn el0_handler() {
 
     unsafe {
         asm!(
-            "mrs {esr},  esr_el1",
-            "mrs {far},  far_el1",
-            "mrs {elr},  elr_el1",
-            "mrs {spsr}, spsr_el1",
-            esr = out(reg) esr,
-            far = out(reg) far,
-            elr = out(reg) elr,
-            spsr = out(reg) spsr,
-            options(nomem, nostack, preserves_flags),
+        "mrs {esr},  esr_el1",
+        "mrs {far},  far_el1",
+        "mrs {elr},  elr_el1",
+        "mrs {spsr}, spsr_el1",
+        esr = out(reg) esr,
+        far = out(reg) far,
+        elr = out(reg) elr,
+        spsr = out(reg) spsr,
+        options(nomem, nostack, preserves_flags),
         );
     }
 

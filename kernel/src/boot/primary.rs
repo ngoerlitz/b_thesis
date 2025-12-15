@@ -10,6 +10,7 @@ use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::platform::aarch64::{cpu, get_cpu_timer};
+use crate::test::kernel_func;
 use crate::{bsp, kprintln};
 use alloc::sync::Arc;
 use core::arch::asm;
@@ -90,9 +91,7 @@ fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
     (info_base as u64, sp_aligned as u64)
 }
 
-pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(
-    actor: A
-) {
+pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
     init_heap();
     init_mailboxes();
 
@@ -112,7 +111,7 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(
     kprintln!("[INFO] Kernel Initializing");
 
     {
-        let mut irq = IRQ_MANAGER.write();
+        let mut irq = RootEnvironment::get().irq_manager().write();
         irq.inner_mut().init();
         irq.enable_irq(IrqType::from(bsp::constants::IRQ_PHYS_TIMER), None);
         irq.set_irq_handler(IrqType::from(bsp::constants::IRQ_PHYS_TIMER), |_| {
@@ -124,7 +123,7 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(
 
         let timer = get_cpu_timer();
         timer.init();
-        timer.set_interval(Duration::from_millis(500));
+        timer.set_interval(Duration::from_millis(100));
         let _ = timer.enable();
 
         for _ in 0..100_000 {
@@ -138,9 +137,13 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(
 
     cpu::enable_irq();
 
-    let _ = RootEnvironment::get().spawn(actor).unwrap();
+    kernel_func();
 
-    RootEnvironment::get().enter();
+    loop {}
+
+    // let _ = RootEnvironment::get().spawn(actor).unwrap();
+    //
+    // RootEnvironment::get().enter();
 
     /*
         unsafe {

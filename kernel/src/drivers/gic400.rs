@@ -152,6 +152,12 @@ impl GIC400 {
         unsafe { (*iar).read() }
     }
 
+    pub fn irq_info() -> (u32, u32) {
+        let iar = Self::read_iar();
+
+        (iar, iar & 0x3FF)
+    }
+
     pub fn write_eoir(val: u32) {
         let eoir: *mut WriteOnly<RegU32> = gicc_reg_access!(GIC400GICCRegisters, eoir);
 

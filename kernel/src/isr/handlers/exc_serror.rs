@@ -1,13 +1,13 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
-use crate::isr::ExceptionFrame;
+use crate::isr::ISRContext;
 use crate::kprintln;
 use crate::platform::aarch64::registers::esr_el1::ESR_EL1;
 use crate::platform::aarch64::registers::far_el1::FAR_EL1;
 use core::arch::asm;
 
 #[unsafe(no_mangle)]
-extern "C" fn exc_serror(frame: &mut ExceptionFrame) {
+extern "C" fn exc_serror(frame: &mut ISRContext) {
     let mut lock = unsafe { PL011::new(0xFE201000) };
     let _ = lock.enable();
 

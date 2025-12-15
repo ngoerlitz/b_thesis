@@ -1,25 +1,39 @@
 use crate::drivers::pl011::PL011;
-use crate::hal::timer::SystemTimer;
+use crate::hal::timer::SystemTimerDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::{UART0, UartSink, kprintln};
+use crate::{kprintln, save_gp_regs};
 use alloc::format;
 use alloc::string::String;
 use core::arch::asm;
 use core::fmt::Write;
 use core::ops::DerefMut;
+use core::ptr::addr_of;
 
 pub fn kernel_func() {
     // Runs at EL1
-    let timer = get_cpu_timer().get_value() % 100;
-    let mut x = timer as i32;
+    let timer = get_cpu_timer().now().as_millis();
+    let mut x = 5;
     let y = 13;
     let z = String::from("Hello World");
+
+    kprintln!("Address of x: {:x}", (&raw const x) as u64);
 
     print_kernel_data(&mut x, &y, &z);
 }
 
 unsafe extern "C" {
     static __stack_el0_top: usize;
+}
+
+fn sp() -> u64 {
+    let mut sp: u64 = 0;
+    unsafe {
+        asm!(
+        "mov {}, sp" // x2 = x_ptr
+        , out(reg) sp, options(nostack, preserves_flags));
+    }
+
+    sp
 }
 
 fn user_stack_top() -> usize {
@@ -48,10 +62,11 @@ pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
     let x_ptr: u64 = x as *mut i32 as u64;
 
     kprintln!(
-        "[{cpuid}] CurrentEL: {} | EL0_SP: {:X} | USER_FP: {:X}",
+        "[{cpuid}] CurrentEL: {} | EL0_SP: {:X} | USER_FP: {:X} <> [EL1_SP = {:x}]",
         cpu::current_el(),
         el0_sp,
-        user_fp
+        user_fp,
+        sp()
     );
 
     // TODO: We need to save CPSR/PSTATE flags here to.
@@ -59,65 +74,59 @@ pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
     loop {
         unsafe {
             asm!(
-            "sub sp, sp, #288",
+                "msr DAIFSet, #0b1111",
+                "isb",
 
-            // store general purpose registers
-            "stp x0, x1, [sp, #16 * 0]",
-            "stp x2, x3, [sp, #16 * 1]",
-            "stp x4, x5, [sp, #16 * 2]",
-            "stp x6, x7, [sp, #16 * 3]",
-            "stp x8, x9, [sp, #16 * 4]",
-            "stp x10, x11, [sp, #16 * 5]",
-            "stp x12, x13, [sp, #16 * 6]",
-            "stp x14, x15, [sp, #16 * 7]",
-            "stp x16, x17, [sp, #16 * 8]",
-            "stp x18, x19, [sp, #16 * 9]",
-            "stp x20, x21, [sp, #16 * 10]",
-            "stp x22, x23, [sp, #16 * 11]",
-            "stp x24, x25, [sp, #16 * 12]",
-            "stp x26, x27, [sp, #16 * 13]",
-            "stp x28, x29, [sp, #16 * 14]",
+                "mov x9, sp",
 
+                "sub sp, sp, #304",
 
-            // ELR/SPSR pair
-            "mrs x0, ELR_EL1",
-            "mrs x1, SPSR_EL1",
-            "stp x0, x1, [sp, #16 * 15]",    // offset 240
+                save_gp_regs!(),
 
-            // LR (x30) and 8-byte padding to keep 16B alignment
-            "adr x0, 1f",
-            "str x0, [sp, #16 * 16]",        // offset 256
+                "mrs x0, ELR_EL1",
+                "mrs x1, SPSR_EL1",
+                "stp x0, x1, [sp, #16*15]",
 
-            // Store &mut x
-            "str {xptr}, [sp, #16 * 17]",
+                "adr x0, 1f",
+                "str x0,  [sp, #16*16]",
+                "str x30, [sp, #16*16 + 8]",
+                "str x9,  [sp, #16*17]",
+                "str {xptr}, [sp, #16*17 + 8]",
 
-            // We've stored all registers, now lets go to EL0
-            "msr SP_EL0, {el0_stack_top}",
-            "msr ELR_EL1, {user_func_ptr}",
-            "mov  x0, #(1<<9 | 1<<8 | 0<<7)",   // D|A|I masks
-            "msr  SPSR_EL1, xzr",                // EL0t + DAIF masked
+                "str x9, [sp, #16 * 18]",
 
-            "mov x0, {core_id}",
+                "msr SP_EL0, {el0_stack_top}",
+                "msr ELR_EL1, {user_func_ptr}",
 
-            "isb",
-            "eret",
+                "msr SPSR_EL1, xzr",
 
-            "1:",
+                "mov x0, {core_id}",
+                "isb",
 
-            el0_stack_top = in(reg) el0_sp,
-            user_func_ptr = in(reg) user_fp,
-            xptr = in(reg) x_ptr,
-            core_id = in(reg) cpuid,
+                "eret",
+                "1:",
+
+                el0_stack_top = in(reg) el0_sp,
+                user_func_ptr = in(reg) user_fp,
+                xptr         = in(reg) x_ptr,
+                core_id      = in(reg) cpuid,
+
+                out("x9") _,
+
+                // do not claim nostack (we change sp)
+                options(preserves_flags),
             );
         }
 
         {
+            unsafe {
+                for _ in 0..5_000_000 {
+                    asm!("nop");
+                }
+            }
+
             // If you get here, we returned from EL0 via SVC and restored EL1 state.
             kprintln!("[{cpuid}] EL1; x={x}, y={y}, z={z}");
-        }
-
-        for _ in 0..5_000_000 {
-            unsafe { asm!("nop") }
         }
     }
 }
@@ -196,9 +205,12 @@ pub fn user_func(cpu_id: u8) {
 
     let (p, n) = sbuf.as_ptr_len();
     sys_write(p, n);
+    sys_write(p, n);
 
-    for _ in 0..10_000_000 {
-        unsafe { asm!("nop") }
+    unsafe {
+        for _ in 0..5_000_000 {
+            asm!("nop");
+        }
     }
 
     // Trigger SVC to return to EL1

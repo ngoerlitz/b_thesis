@@ -1,5 +1,5 @@
 use crate::hal::driver::Driver;
-use crate::hal::timer::SystemTimerDriver;
+use crate::hal::timer::{Instant, SystemTimerDriver};
 use crate::kprintln;
 use crate::platform::aarch64::registers::cntfrq_el0::CNTFRQ_EL0;
 use crate::platform::aarch64::registers::cntp_ctl_el0::CNTP_CTL_EL0;
@@ -28,8 +28,8 @@ impl EL1PhysicalTimer {
         CNTP_CTL_EL0.clear_bit(0);
     }
 
-    fn get_timer_info(&self) -> (u64, u64) {
-        (CNTFRQ_EL0.read(), CNTPCT_EL0.read())
+    fn get_timer_details(&self) -> (u64, u64) {
+        (CNTPCT_EL0.read(), CNTFRQ_EL0.read())
     }
 
     pub fn set_interval(&mut self, duration: Duration) {
@@ -58,12 +58,13 @@ impl EL1PhysicalTimer {
 }
 
 impl SystemTimerDriver for EL1PhysicalTimer {
-    fn now(&self) -> u64 {
-        CNTPCT_EL0.read()
+    fn now(&self) -> Instant {
+        let info = self.get_timer_details();
+        Instant::from_ticks(info.0, info.1)
     }
 
-    fn get_frequency(&self) -> u64 {
-        self.get_timer_info().0
+    fn frequency(&self) -> u64 {
+        self.get_timer_details().1
     }
 }
 

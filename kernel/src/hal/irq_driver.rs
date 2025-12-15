@@ -1,4 +1,5 @@
 use crate::hal::driver::Driver;
+use crate::isr::el::ExceptionLevel;
 use bitflags::bitflags;
 
 bitflags! {
@@ -32,6 +33,12 @@ impl From<usize> for IrqType {
         }
 
         Self::Spi(irq_type as u16)
+    }
+}
+
+impl From<u32> for IrqType {
+    fn from(value: u32) -> Self {
+        Self::from(value as usize)
     }
 }
 

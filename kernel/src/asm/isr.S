@@ -6,34 +6,60 @@
 .extern unhandled_irq
 .extern __stack_el0_top
 
-.equ CONTEXT_SIZE, 272 // Must by 16 Byte aligned as per AAPCS64
+/*
+ * Must by 16 Byte aligned as per AAPCS64
+ */
+.equ CONTEXT_SIZE, 272
 
-.macro EXCEPTION_VECTOR handler
-    msr DAIFSet, #0b1111 // D/A/I/F mask
-    sub sp, sp, #CONTEXT_SIZE
-
+/*
+ * This macro stores all of the general purpose registers (x0 - x29) on the stack pointer `sp`
+ *
+ * 60 Bytes (15 Instructions * 4 Bytes)
+ */
+.macro STORE_GP_REGS
     // store general purpose registers
-    stp x0, x1, [sp, #16 * 0]
-    stp x2, x3, [sp, #16 * 1]
-    stp x4, x5, [sp, #16 * 2]
-    stp x6, x7, [sp, #16 * 3]
-    stp x8, x9, [sp, #16 * 4]
-    stp x10, x11, [sp, #16 * 5]
-    stp x12, x13, [sp, #16 * 6]
-    stp x14, x15, [sp, #16 * 7]
-    stp x16, x17, [sp, #16 * 8]
-    stp x18, x19, [sp, #16 * 9]
+    stp x0, x1,   [sp, #16 *  0]
+    stp x2, x3,   [sp, #16 *  1]
+    stp x4, x5,   [sp, #16 *  2]
+    stp x6, x7,   [sp, #16 *  3]
+    stp x8, x9,   [sp, #16 *  4]
+    stp x10, x11, [sp, #16 *  5]
+    stp x12, x13, [sp, #16 *  6]
+    stp x14, x15, [sp, #16 *  7]
+    stp x16, x17, [sp, #16 *  8]
+    stp x18, x19, [sp, #16 *  9]
     stp x20, x21, [sp, #16 * 10]
     stp x22, x23, [sp, #16 * 11]
     stp x24, x25, [sp, #16 * 12]
     stp x26, x27, [sp, #16 * 13]
     stp x28, x29, [sp, #16 * 14]
+.endm
 
-
-    // ELR/SPSR pair
+/*
+ * This macro stores the special registers `ELR_EL1` and `SPSR_EL1` at the offsets matching the `STORE_GP_REGS`
+ * macro.
+ *
+ * 12 Bytes (3 Instructions * 4 Bytes)
+ */
+.macro STORE_SPECIAL_REGS
     mrs x0, ELR_EL1
     mrs x1, SPSR_EL1
-    stp x0, x1, [sp, #16 * 15]     // offset 240
+    stp x0, x1,   [sp, #16 * 15]
+.endm
+
+/*
+ *
+ * 20 Bytes (5 Instructions * 4 Bytes)
+ * + sizeof(STORE_GP_REGS) = 60
+ * + sizeof(STORE_SPECIAL_REGS) = 12
+ * = 92 Bytes
+ */
+.macro ISR_STORE_STACK
+    msr DAIFSet, #0b1111 // D/A/I/F mask
+    sub sp, sp, #CONTEXT_SIZE
+
+    STORE_GP_REGS
+    STORE_SPECIAL_REGS
 
     // LR (x30) and 8-byte padding to keep 16B alignment
     str x30, [sp, #16 * 16]        // offset 256
@@ -41,19 +67,31 @@
 
     // arg0 = &ExceptionFrame
     mov x0, sp
-
-    bl \handler
-    b .exit_exception
 .endm
 
 .macro VECTOR label
     .balign 0x80
-    EXCEPTION_VECTOR \label
+
+    ISR_STORE_STACK
+
+    bl \label
+    b .exit_exception
 .endm
 
-.macro VECTOR_BR label
+.macro VECTOR_SYNC label
     .balign 0x80
-    b \label
+
+    ISR_STORE_STACK
+
+    // We are storing the address of the previous SP, which would contain
+    // the EL1 execution stack from before the EL1 -> EL0 switch. If the SVC
+    // requests an EL0 -> EL1 transition, these values are used to restore the
+    // previous EL1 state. In this case, the following `.exit_exception` is
+    // NOT called.
+    add x1, sp, #CONTEXT_SIZE
+    bl \label
+    b .exit_exception
+
 .endm
 
 .section .text
@@ -83,7 +121,7 @@ el1_vectors:
 //------------------------------------------------------------------------------
 // From Lower EL (AArch64)
 //------------------------------------------------------------------------------
-    VECTOR_BR el0_sync             // VBAR_EL1 + 0x400  EL0: Synchronous
+    VECTOR_SYNC el0_sync           // VBAR_EL1 + 0x400  EL0: Synchronous
     VECTOR el0_irq                 // VBAR_EL1 + 0x480  EL0: IRQ
     VECTOR unhandled_irq           // VBAR_EL1 + 0x500  EL0: FIQ
     VECTOR unhandled_irq           // VBAR_EL1 + 0x580  EL0: SError
@@ -125,7 +163,5 @@ el1_vectors:
 
     // restore stack pointer
     add sp, sp, #CONTEXT_SIZE
-
-    msr DAIFClr, #0b0111
 
     eret

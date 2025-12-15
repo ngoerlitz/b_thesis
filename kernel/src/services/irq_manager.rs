@@ -2,12 +2,13 @@ use crate::drivers::gic400::GIC400;
 use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, InterruptGroup, IrqDriver, IrqType};
-use crate::isr::ExceptionFrame;
+use crate::isr::ISRContext;
+use crate::isr::el::ExceptionLevel;
 use core::fmt::{Display, Formatter};
 
 pub struct IrqManagerService<T: IrqDriver, const N: usize> {
     driver: T,
-    callback: [Option<fn(&mut ExceptionFrame)>; N],
+    callback: [Option<fn(&mut ISRContext)>; N],
 }
 
 impl<T: IrqDriver, const N: usize> IrqManagerService<T, N> {
@@ -58,7 +59,7 @@ impl<T: IrqDriver, const N: usize> InterruptController for IrqManagerService<T, 
         self.driver.set_irq_group(irq_type, group);
     }
 
-    fn set_irq_handler(&mut self, irq_type: IrqType, handler: fn(&mut ExceptionFrame)) {
+    fn set_irq_handler(&mut self, irq_type: IrqType, handler: fn(&mut ISRContext)) {
         let idx: usize = irq_type.into();
         assert!(
             idx < self.callback.len(),
@@ -68,8 +69,14 @@ impl<T: IrqDriver, const N: usize> InterruptController for IrqManagerService<T, 
         self.callback[idx] = Some(handler);
     }
 
-    fn get_irq_handler(&self, irq_type: IrqType) -> Option<fn(&mut ExceptionFrame)> {
+    fn get_irq_handler(&self, irq_type: IrqType) -> Option<fn(&mut ISRContext)> {
         let idx: usize = irq_type.into();
         self.callback[idx]
+    }
+
+    fn dispatch(&self, irq_type: IrqType, ctx: &mut ISRContext) {
+        if let Some(handler) = self.get_irq_handler(irq_type) {
+            handler(ctx)
+        }
     }
 }

@@ -17,4 +17,5 @@ mod hal;
 mod isr;
 mod platform;
 mod services;
+mod test;
 pub mod utils;

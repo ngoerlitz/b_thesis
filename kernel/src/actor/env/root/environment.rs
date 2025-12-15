@@ -4,11 +4,14 @@ use crate::actor::env::root::ctx::{
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
 use crate::actor::runtime::handler::RuntimeHandler;
 use crate::boot::global;
+use crate::drivers::gic400::GIC400;
 use crate::drivers::pl011::PL011;
 use crate::getter;
 use crate::hal::serial::SerialDriver;
+use crate::services::irq_manager::IrqManagerService;
 use alloc::alloc::Global;
 use alloc::sync::Arc;
+use spin::RwLock;
 use zcene_core::actor::{
     Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference,
     ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress,
@@ -23,6 +26,7 @@ where
 {
     future_runtime: FutureRuntimeReference<H>,
     logger: ActorRootLoggerService<L>,
+    irq_manager: RwLock<IrqManagerService<GIC400, 216>>,
 }
 
 impl<H: FutureRuntimeHandler, L: SerialDriver> RootEnvironment<H, L> {
@@ -33,11 +37,13 @@ impl<H: FutureRuntimeHandler, L: SerialDriver> RootEnvironment<H, L> {
         Self {
             future_runtime,
             logger,
+            irq_manager: RwLock::new(IrqManagerService::new(GIC400::new())),
         }
     }
 
     getter!(future_runtime: FutureRuntimeReference<H> as runtime);
     getter!(logger: ActorRootLoggerService<L>);
+    getter!(irq_manager: RwLock<IrqManagerService<GIC400, 216>>);
 
     pub fn enter(&self) -> Result<(), ActorEnterError> {
         self.future_runtime.run();
