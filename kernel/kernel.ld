@@ -1,5 +1,7 @@
-/* AArch64 bare-metal (RPi4) */
-ENTRY(_start)
+__rpi_phys_dram_start_addr = 0;
+
+/* The physical address at which the the kernel binary will be loaded by the Raspberry's firmware */
+__rpi_phys_binary_load_addr = 0x80000;
 
 /* ---- constants ---- */
 STACK_SIZE   = 16K;
@@ -7,83 +9,93 @@ NUM_KSTACKS  = 4;
 HEAP_SIZE    = 1024M;
 PAGE_SIZE    = 4K;
 
-MEMORY {
-  SDRAM (rwx) : ORIGIN = 0x0, LENGTH = 2048M
-}
+NUM_USTACKS = 1;
+USTACK_SIZE = 16K;
 
-/* ---- tops of stacks at end of RAM ---- */
-__ram_end          = (ORIGIN(SDRAM) + LENGTH(SDRAM));
-__stack_00_el1_top = (__ram_end & ~15);
-__stack_01_el1_top = (__stack_00_el1_top - 1 * STACK_SIZE);
-__stack_02_el1_top = (__stack_00_el1_top - 2 * STACK_SIZE);
-__stack_03_el1_top = (__stack_00_el1_top - 3 * STACK_SIZE);
-__stack_el0_top    = (__stack_00_el1_top - 4 * STACK_SIZE);
-__stack_bottom = (__stack_el0_top & ~15);
+ENTRY(_start)
 
-__mailbox_top = (__stack_bottom - 1 * STACK_SIZE);
+/* Program headers for ELF loaders (e.g. QEMU -kernel with ELF) */
+__stack_00_el1_top = (0x10000);
 
 SECTIONS
 {
-  /* Kernel image load address */
-  . = 0x80000;
+    . = __rpi_phys_binary_load_addr;
 
-  /* Keep boot code */
-  .init : {
-    KEEP(*(.init))
-  } > SDRAM 
+    /***********************************************************************************************
+    * Code + RO Data + Global Offset Table
+    ***********************************************************************************************/
+    .text :
+    {
+        KEEP(*(.text._start))
+        *(.text._start_arguments) /* Constants (or statics in Rust speak) read by _start(). */
+        *(.text._start_rust)      /* The Rust entry point */
+        *(.text*)                 /* Everything else */
+    }
 
-  /* ---- kernel text ---- */
-  . = ALIGN(PAGE_SIZE);
-  __text_start = .;
-  .text : {
-    *(.text .text.*)
-  } > SDRAM 
-  __text_end = .;
+    .rodata : ALIGN(8)
+    {
+        *(.rodata*)
+    }
 
-  /* ---- read-only data ---- */
-  . = ALIGN(PAGE_SIZE);
-  __rodata_start = .;
-  .rodata : {
-    *(.rodata .rodata.*)
-  } > SDRAM 
-  __rodata_end = .;
+    /***********************************************************************************************
+    * Data + BSS
+    ***********************************************************************************************/
+    .data :
+    {
+        *(.data*)
+    }
 
-  /* ---- kernel data ---- */
-  . = ALIGN(PAGE_SIZE);
-  __data_start = .;
-  .data : {
-    *(.data .data.*)
-  } > SDRAM 
-  __data_end = .;
+    /* Section is zeroed in pairs of u64. Align start and end to 16 bytes */
+    .bss (NOLOAD) : ALIGN(16)
+    {
+        __bss_start = .;
+        *(.bss*);
+        . = ALIGN(16);
+        __bss_end_exclusive = .;
+    }
 
-  /* ---- kernel BSS ---- */
-  . = ALIGN(PAGE_SIZE);
-  __bss_start = .;
-  .bss (NOLOAD) : {
-    *(.bss .bss.*)
-    *(COMMON)
-  } > SDRAM 
-  __bss_end = .;
+    /***********************************************************************************************
+    * Misc
+    ***********************************************************************************************/
+    .got :
+    {
+        *(.got*)
+    }
+    ASSERT(SIZEOF(.got) == 0, "Relocation support not expected")
 
-    /* ---- user text (run at EL0) ----
-       Place any function with:  #[link_section = ".user_text"]
-    */
-      . = ALIGN(PAGE_SIZE);
-      __user_text_start = .;
-      .user_text : {
-        KEEP(*(.user_text .user_text.*))
-      } > SDRAM 
-      __user_text_end = .;
+    /DISCARD/ : { *(.comment*) }
 
-  /* ---- heap ---- */
-  . = ALIGN(8);
-  __heap_start = .;
-  . = . + HEAP_SIZE;
-  __heap_end = .;
+        /***********************************************************************************************
+        * User image (EL0) - keep contiguous and 2MiB-aligned for single L2 block mapping
+        ***********************************************************************************************/
+
+        /* Start of the user-mapped region: MUST be 2MiB aligned */
+        . = ALIGN(0x200000);
+        __user_start = .;
+
+        /* User code */
+        .user_text : ALIGN(16)
+        {
+            __user_text_start = .;
+            KEEP(*(.user_text .user_text.*))
+            __user_text_end = .;
+        }
+
+        .user_stack (NOLOAD) : ALIGN(16)
+        {
+            __ustack_start = .;
+            . = . + (USTACK_SIZE * NUM_USTACKS);
+            __ustack_end = .;
+        }
+
+        __stack_el0_top = __ustack_end;
+
+        /* If you want to map EXACTLY one 2MiB L2 block:
+           pad the end to the next 2MiB boundary and export __user_end.
+           Then map [__user_start, __user_end) as one 2MiB block. */
+        . = ALIGN(0x200000);
+        __user_end = .;
+
+        /* Safety: ensure the whole user image fits in a single 2MiB block */
+        ASSERT((__user_end - __user_start) <= 0x200000, "User image exceeds 2MiB")
 }
-
-/* sanity checks */
-ASSERT(__heap_end <= (__stack_el0_top - STACK_SIZE),
-       "Error: heap overlaps with stacks; reduce heap or stack size");
-ASSERT(__heap_end <= __ram_end,
-       "Error: heap exceeds SDRAM");

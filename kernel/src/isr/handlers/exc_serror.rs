@@ -80,58 +80,57 @@ extern "C" fn exc_serror(frame: &mut ISRContext) {
     kprintln!("-- Registers --");
     kprintln!(
         "x0 ={:#018x}  x1 ={:#018x}  x2 ={:#018x}  x3 ={:#018x}",
-        frame.x0,
-        frame.x1,
-        frame.x2,
-        frame.x3
+        frame.x[0],
+        frame.x[1],
+        frame.x[2],
+        frame.x[3]
     );
     kprintln!(
         "x4 ={:#018x}  x5 ={:#018x}  x6 ={:#018x}  x7 ={:#018x}",
-        frame.x4,
-        frame.x5,
-        frame.x6,
-        frame.x7
+        frame.x[4],
+        frame.x[5],
+        frame.x[6],
+        frame.x[7]
     );
     kprintln!(
         "x8 ={:#018x}  x9 ={:#018x}  x10={:#018x}  x11={:#018x}",
-        frame.x8,
-        frame.x9,
-        frame.x10,
-        frame.x11
+        frame.x[8],
+        frame.x[9],
+        frame.x[10],
+        frame.x[11]
     );
     kprintln!(
         "x12={:#018x}  x13={:#018x}  x14={:#018x}  x15={:#018x}",
-        frame.x12,
-        frame.x13,
-        frame.x14,
-        frame.x15
+        frame.x[12],
+        frame.x[13],
+        frame.x[14],
+        frame.x[15]
     );
     kprintln!(
         "x16={:#018x}  x17={:#018x}  x18={:#018x}  x19={:#018x}",
-        frame.x16,
-        frame.x17,
-        frame.x18,
-        frame.x19
+        frame.x[16],
+        frame.x[17],
+        frame.x[18],
+        frame.x[19]
     );
     kprintln!(
         "x20={:#018x}  x21={:#018x}  x22={:#018x}  x23={:#018x}",
-        frame.x20,
-        frame.x21,
-        frame.x22,
-        frame.x23
+        frame.x[20],
+        frame.x[21],
+        frame.x[22],
+        frame.x[23]
     );
     kprintln!(
         "x24={:#018x}  x25={:#018x}  x26={:#018x}  x27={:#018x}",
-        frame.x24,
-        frame.x25,
-        frame.x26,
-        frame.x27
+        frame.x[24],
+        frame.x[25],
+        frame.x[26],
+        frame.x[27]
     );
     kprintln!(
-        "x28={:#018x}  x29={:#018x}  x30={:#018x}",
-        frame.x28,
-        frame.x29,
-        frame.x30
+        "x28={:#018x}  x29={:#018x}  x30=????",
+        frame.x[28],
+        frame.x[29],
     );
 
     kprintln!("===============================\n");

@@ -5,36 +5,7 @@ mod handlers;
 
 #[repr(C)]
 pub struct ISRContext {
-    pub x0: u64,
-    pub x1: u64,
-    pub x2: u64,
-    pub x3: u64,
-    pub x4: u64,
-    pub x5: u64,
-    pub x6: u64,
-    pub x7: u64,
-    pub x8: u64,
-    pub x9: u64,
-    pub x10: u64,
-    pub x11: u64,
-    pub x12: u64,
-    pub x13: u64,
-    pub x14: u64,
-    pub x15: u64,
-    pub x16: u64,
-    pub x17: u64,
-    pub x18: u64,
-    pub x19: u64,
-    pub x20: u64,
-    pub x21: u64,
-    pub x22: u64,
-    pub x23: u64,
-    pub x24: u64,
-    pub x25: u64,
-    pub x26: u64,
-    pub x27: u64,
-    pub x28: u64,
-    pub x29: u64,
+    pub x: [u64; 30],
 
     pub elr_el1: u64,
     pub spsr_el1: u64,
@@ -45,36 +16,7 @@ pub struct ISRContext {
 
 #[repr(C)]
 pub struct EL1Context {
-    pub x0: u64,
-    pub x1: u64,
-    pub x2: u64,
-    pub x3: u64,
-    pub x4: u64,
-    pub x5: u64,
-    pub x6: u64,
-    pub x7: u64,
-    pub x8: u64,
-    pub x9: u64,
-    pub x10: u64,
-    pub x11: u64,
-    pub x12: u64,
-    pub x13: u64,
-    pub x14: u64,
-    pub x15: u64,
-    pub x16: u64,
-    pub x17: u64,
-    pub x18: u64,
-    pub x19: u64,
-    pub x20: u64,
-    pub x21: u64,
-    pub x22: u64,
-    pub x23: u64,
-    pub x24: u64,
-    pub x25: u64,
-    pub x26: u64,
-    pub x27: u64,
-    pub x28: u64,
-    pub x29: u64,
+    pub x: [u64; 30],
 
     pub elr_el1: u64,  // offset 240
     pub spsr_el1: u64, // offset 248
@@ -89,36 +31,44 @@ impl core::fmt::Debug for ISRContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("ExceptionFrame");
 
-        ds.field("x0", &format_args!("{:#0x}", self.x0));
-        ds.field("x1", &format_args!("{:#0x}", self.x1));
-        ds.field("x2", &format_args!("{:#0x}", self.x2));
-        ds.field("x3", &format_args!("{:#0x}", self.x3));
-        ds.field("x4", &format_args!("{:#0x}", self.x4));
-        ds.field("x5", &format_args!("{:#0x}", self.x5));
-        ds.field("x6", &format_args!("{:#0x}", self.x6));
-        ds.field("x7", &format_args!("{:#0x}", self.x7));
-        ds.field("x8", &format_args!("{:#0x}", self.x8));
-        ds.field("x9", &format_args!("{:#0x}", self.x9));
-        ds.field("x10", &format_args!("{:#0x}", self.x10));
-        ds.field("x11", &format_args!("{:#0x}", self.x11));
-        ds.field("x12", &format_args!("{:#0x}", self.x12));
-        ds.field("x13", &format_args!("{:#0x}", self.x13));
-        ds.field("x14", &format_args!("{:#0x}", self.x14));
-        ds.field("x15", &format_args!("{:#0x}", self.x15));
-        ds.field("x16", &format_args!("{:#0x}", self.x16));
-        ds.field("x17", &format_args!("{:#0x}", self.x17));
-        ds.field("x18", &format_args!("{:#0x}", self.x18));
-        ds.field("x19", &format_args!("{:#0x}", self.x19));
-        ds.field("x20", &format_args!("{:#0x}", self.x20));
-        ds.field("x21", &format_args!("{:#0x}", self.x21));
-        ds.field("x22", &format_args!("{:#0x}", self.x22));
-        ds.field("x23", &format_args!("{:#0x}", self.x23));
-        ds.field("x24", &format_args!("{:#0x}", self.x24));
-        ds.field("x25", &format_args!("{:#0x}", self.x25));
-        ds.field("x26", &format_args!("{:#0x}", self.x26));
-        ds.field("x27", &format_args!("{:#0x}", self.x27));
-        ds.field("x28", &format_args!("{:#0x}", self.x28));
-        ds.field("x29", &format_args!("{:#0x}", self.x29));
+        for i in 0..30 {
+            let name = match i {
+                0 => "x0",
+                1 => "x1",
+                2 => "x2",
+                3 => "x3",
+                4 => "x4",
+                5 => "x5",
+                6 => "x6",
+                7 => "x7",
+                8 => "x8",
+                9 => "x9",
+                10 => "x10",
+                11 => "x11",
+                12 => "x12",
+                13 => "x13",
+                14 => "x14",
+                15 => "x15",
+                16 => "x16",
+                17 => "x17",
+                18 => "x18",
+                19 => "x19",
+                20 => "x20",
+                21 => "x21",
+                22 => "x22",
+                23 => "x23",
+                24 => "x24",
+                25 => "x25",
+                26 => "x26",
+                27 => "x27",
+                28 => "x28",
+                29 => "x29",
+                30 => "x30",
+                _ => unreachable!(),
+            };
+
+            ds.field(name, &self.x[i]);
+        }
 
         ds.field("elr_el1", &format_args!("{:#0x}", self.elr_el1));
         ds.field("spsr_el1", &format_args!("{:#0x}", self.spsr_el1));
@@ -134,36 +84,44 @@ impl core::fmt::Debug for EL1Context {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("ExceptionFrame");
 
-        ds.field("x0", &format_args!("{:#0x}", self.x0));
-        ds.field("x1", &format_args!("{:#0x}", self.x1));
-        ds.field("x2", &format_args!("{:#0x}", self.x2));
-        ds.field("x3", &format_args!("{:#0x}", self.x3));
-        ds.field("x4", &format_args!("{:#0x}", self.x4));
-        ds.field("x5", &format_args!("{:#0x}", self.x5));
-        ds.field("x6", &format_args!("{:#0x}", self.x6));
-        ds.field("x7", &format_args!("{:#0x}", self.x7));
-        ds.field("x8", &format_args!("{:#0x}", self.x8));
-        ds.field("x9", &format_args!("{:#0x}", self.x9));
-        ds.field("x10", &format_args!("{:#0x}", self.x10));
-        ds.field("x11", &format_args!("{:#0x}", self.x11));
-        ds.field("x12", &format_args!("{:#0x}", self.x12));
-        ds.field("x13", &format_args!("{:#0x}", self.x13));
-        ds.field("x14", &format_args!("{:#0x}", self.x14));
-        ds.field("x15", &format_args!("{:#0x}", self.x15));
-        ds.field("x16", &format_args!("{:#0x}", self.x16));
-        ds.field("x17", &format_args!("{:#0x}", self.x17));
-        ds.field("x18", &format_args!("{:#0x}", self.x18));
-        ds.field("x19", &format_args!("{:#0x}", self.x19));
-        ds.field("x20", &format_args!("{:#0x}", self.x20));
-        ds.field("x21", &format_args!("{:#0x}", self.x21));
-        ds.field("x22", &format_args!("{:#0x}", self.x22));
-        ds.field("x23", &format_args!("{:#0x}", self.x23));
-        ds.field("x24", &format_args!("{:#0x}", self.x24));
-        ds.field("x25", &format_args!("{:#0x}", self.x25));
-        ds.field("x26", &format_args!("{:#0x}", self.x26));
-        ds.field("x27", &format_args!("{:#0x}", self.x27));
-        ds.field("x28", &format_args!("{:#0x}", self.x28));
-        ds.field("x29", &format_args!("{:#0x}", self.x29));
+        for i in 0..30 {
+            let name = match i {
+                0 => "x0",
+                1 => "x1",
+                2 => "x2",
+                3 => "x3",
+                4 => "x4",
+                5 => "x5",
+                6 => "x6",
+                7 => "x7",
+                8 => "x8",
+                9 => "x9",
+                10 => "x10",
+                11 => "x11",
+                12 => "x12",
+                13 => "x13",
+                14 => "x14",
+                15 => "x15",
+                16 => "x16",
+                17 => "x17",
+                18 => "x18",
+                19 => "x19",
+                20 => "x20",
+                21 => "x21",
+                22 => "x22",
+                23 => "x23",
+                24 => "x24",
+                25 => "x25",
+                26 => "x26",
+                27 => "x27",
+                28 => "x28",
+                29 => "x29",
+                30 => "x30",
+                _ => unreachable!(),
+            };
+
+            ds.field(name, &self.x[i]);
+        }
 
         ds.field("elr_el1", &format_args!("{:#0x}", self.elr_el1));
         ds.field("spsr_el1", &format_args!("{:#0x}", self.spsr_el1));

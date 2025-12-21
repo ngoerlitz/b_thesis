@@ -2,7 +2,6 @@
 .include "src/asm/el/consts.S"
 
 .globl _el2
-.extern __stack_el0_top
 
 /*
 * Bit definitions for the HCR_EL2 (Hypervisor Configuration Register)
@@ -22,14 +21,14 @@ _el2:
     CHECK_NOT_EL CurrentEL_EL2, _el1
 
     // Set execution state for EL1 to AArch64
-    mov x0, #HCR_RW
-    msr HCR_EL2, x0
+    mov x1, #HCR_RW
+    msr HCR_EL2, x1
     isb
 
     // Allow EL1 to read CNTPCT/Phys-Timer
-    mrs x0, CNTHCTL_EL2
-    orr x0, x0, #(EL1PCEN|EL1PCTEN)
-    msr CNTHCTL_EL2, x0
+    mrs x1, CNTHCTL_EL2
+    orr x1, x1, #(EL1PCEN|EL1PCTEN)
+    msr CNTHCTL_EL2, x1
     msr CNTVOFF_EL2, xzr
     isb
 
@@ -41,19 +40,19 @@ _el2:
 
     // VBAR_EL1
     // TODO: This needs to be done PER CORE? (Justus?)
-    ldr x0, =el1_vectors
-    msr VBAR_EL1, x0
+    ldr x1, =el1_vectors
+    msr VBAR_EL1, x1
     isb
 
     msr SPSel, #1
 
     // Return to EL1h with DAIF masked
-    mov x0, #(SPSR_D|SPSR_A|SPSR_I|SPSR_F|SPSR_EL1h)
-    msr SPSR_EL2, x0
+    mov x1, #(SPSR_D|SPSR_A|SPSR_I|SPSR_F|SPSR_EL1h)
+    msr SPSR_EL2, x1
 
     // Set return addr to EL1
-    adr x0, _el1
-    msr ELR_EL2, x0
+    adr x1, _el1
+    msr ELR_EL2, x1
     isb
 
     eret

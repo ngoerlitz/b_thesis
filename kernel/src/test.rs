@@ -5,7 +5,7 @@ use crate::{kprintln, save_gp_regs};
 use alloc::format;
 use alloc::string::String;
 use core::arch::asm;
-use core::fmt::Write;
+use core::mem::MaybeUninit;
 use core::ops::DerefMut;
 use core::ptr::addr_of;
 
@@ -119,11 +119,11 @@ pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
         }
 
         {
-            unsafe {
-                for _ in 0..5_000_000 {
-                    asm!("nop");
-                }
-            }
+            // unsafe {
+            //     for _ in 0..5_000_000 {
+            //         asm!("nop");
+            //     }
+            // }
 
             // If you get here, we returned from EL0 via SVC and restored EL1 state.
             kprintln!("[{cpuid}] EL1; x={x}, y={y}, z={z}");
@@ -132,90 +132,164 @@ pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
 }
 
 #[inline(always)]
+#[unsafe(link_section = ".user_text")]
 fn sys_write(buf: *const u8, len: usize) {
     unsafe {
         asm!(
-            "svc #0x20",
-            in("x0") buf,
-            in("x1") len,
-            options(nostack, preserves_flags)
+        "svc #0x20",
+        in("x0") buf,
+        in("x1") len,
+        options(nostack, preserves_flags)
         );
     }
 }
 
+// Put ALL constant bytes in .user_text (not default .rodata)
+#[used]
 #[unsafe(link_section = ".user_text")]
-struct StackBuf<const N: usize> {
-    buf: [u8; N],
+static PFX0: [u8; 1] = *b"[";
+
+#[used]
+#[unsafe(link_section = ".user_text")]
+static PFX1: [u8; 3] = *b"] \"";
+
+#[used]
+#[unsafe(link_section = ".user_text")]
+static MID0: [u8; 18] = *b"\", from user_func!";
+
+#[used]
+#[unsafe(link_section = ".user_text")]
+static MID1: [u8; 5] = *b" x = ";
+
+#[used]
+#[unsafe(link_section = ".user_text")]
+static MID2: [u8; 7] = *b" , y = ";
+
+#[used]
+#[unsafe(link_section = ".user_text")]
+static MID3: [u8; 21] = *b" <> [EL0_STACK_TOP = ";
+
+#[used]
+#[unsafe(link_section = ".user_text")]
+static SFX0: [u8; 2] = *b"]\n";
+
+#[repr(C)]
+struct Buf<const N: usize> {
+    buf: [MaybeUninit<u8>; N],
     len: usize,
 }
 
+#[inline(always)]
 #[unsafe(link_section = ".user_text")]
-impl<const N: usize> StackBuf<N> {
-    #[inline(always)]
-    fn new() -> Self {
-        Self {
-            buf: [0; N],
-            len: 0,
-        }
+fn buf_new<const N: usize>() -> Buf<N> {
+    Buf {
+        buf: unsafe { MaybeUninit::uninit().assume_init() },
+        len: 0,
     }
-    #[inline(always)]
-    fn as_ptr_len(&self) -> (*const u8, usize) {
-        (self.buf.as_ptr(), self.len)
+}
+
+#[inline(always)]
+#[unsafe(link_section = ".user_text")]
+fn buf_push_byte<const N: usize>(b: &mut Buf<N>, v: u8) {
+    if b.len < N {
+        b.buf[b.len].write(v);
+        b.len += 1;
+    }
+}
+
+#[inline(always)]
+#[unsafe(link_section = ".user_text")]
+fn buf_push_bytes<const N: usize>(b: &mut Buf<N>, s: *const u8, n: usize) {
+    let mut i = 0;
+    while i < n && b.len < N {
+        unsafe {
+            b.buf[b.len].write(*s.add(i));
+        }
+        b.len += 1;
+        i += 1;
     }
 }
 
 #[unsafe(link_section = ".user_text")]
-impl<const N: usize> core::fmt::Write for StackBuf<N> {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let b = s.as_bytes();
-        if self.len + b.len() > N {
-            return Err(core::fmt::Error);
-        }
-        // safety: bounds checked
-        unsafe {
-            core::ptr::copy_nonoverlapping(
-                b.as_ptr(),
-                self.buf.as_mut_ptr().add(self.len),
-                b.len(),
-            );
-        }
-        self.len += b.len();
-        Ok(())
+fn buf_push_u64_dec<const N: usize>(b: &mut Buf<N>, mut v: u64) {
+    let mut tmp = [0u8; 20];
+    let mut n = 0;
+
+    if v == 0 {
+        buf_push_byte(b, b'0');
+        return;
     }
+    while v != 0 {
+        tmp[n] = b'0' + (v % 10) as u8;
+        n += 1;
+        v /= 10;
+    }
+    while n > 0 {
+        n -= 1;
+        buf_push_byte(b, tmp[n]);
+    }
+}
+
+#[unsafe(link_section = ".user_text")]
+fn buf_push_i64_dec<const N: usize>(b: &mut Buf<N>, v: i64) {
+    if v < 0 {
+        buf_push_byte(b, b'-');
+        buf_push_u64_dec(b, (0u64).wrapping_sub(v as u64));
+    } else {
+        buf_push_u64_dec(b, v as u64);
+    }
+}
+
+#[unsafe(link_section = ".user_text")]
+fn buf_push_u64_hex_0x<const N: usize>(b: &mut Buf<N>, v: u64) {
+    buf_push_byte(b, b'0');
+    buf_push_byte(b, b'x');
+    for i in 0..16 {
+        let shift = (15 - i) * 4;
+        let d = ((v >> shift) & 0xF) as u8;
+        let c = if d < 10 { b'0' + d } else { b'a' + (d - 10) };
+        buf_push_byte(b, c);
+    }
+}
+
+#[inline(always)]
+#[unsafe(link_section = ".user_text")]
+fn buf_ptr_len<const N: usize>(b: &Buf<N>) -> (*const u8, usize) {
+    (b.buf.as_ptr() as *const u8, b.len)
 }
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".user_text")]
-pub fn user_func(cpu_id: u8) {
-    let mut sp: u64;
-    unsafe { asm!("mov {sp}, sp", sp = out(reg) sp) }
+pub extern "C" fn user_func(cpu_id: u8) {
+    let sp: u64;
+    unsafe { asm!("mov {}, sp", out(reg) sp) }
 
-    // Runs at EL0
-    let x = 33;
-    let y = 25;
-    let z = "EL0";
+    let x: i32 = 33;
+    let y: i32 = 25;
 
-    let mut sbuf: StackBuf<128> = StackBuf::new();
-    use core::fmt::Write;
-    let _ = write!(
-        &mut sbuf,
-        "[{}] \"{}\", from user_func! x = {} , y = {} <> [EL0_STACK_TOP = {:#x}]",
-        cpu_id, z, x, y, sp
-    );
+    // Also avoid &str for "EL0" unless you place it as bytes too:
+    #[used]
+    #[unsafe(link_section = ".user_text")]
+    static Z: [u8; 3] = *b"EL0";
 
-    let (p, n) = sbuf.as_ptr_len();
+    let mut b: Buf<192> = buf_new();
+
+    buf_push_bytes(&mut b, PFX0.as_ptr(), PFX0.len());
+    buf_push_u64_dec(&mut b, cpu_id as u64);
+    buf_push_bytes(&mut b, PFX1.as_ptr(), PFX1.len());
+    buf_push_bytes(&mut b, Z.as_ptr(), Z.len());
+    buf_push_bytes(&mut b, MID0.as_ptr(), MID0.len());
+    buf_push_bytes(&mut b, MID1.as_ptr(), MID1.len());
+    buf_push_i64_dec(&mut b, x as i64);
+    buf_push_bytes(&mut b, MID2.as_ptr(), MID2.len());
+    buf_push_i64_dec(&mut b, y as i64);
+    buf_push_bytes(&mut b, MID3.as_ptr(), MID3.len());
+    buf_push_u64_hex_0x(&mut b, sp);
+    buf_push_bytes(&mut b, SFX0.as_ptr(), SFX0.len());
+
+    let (p, n) = buf_ptr_len(&b);
     sys_write(p, n);
-    sys_write(p, n);
 
-    unsafe {
-        for _ in 0..5_000_000 {
-            asm!("nop");
-        }
-    }
-
-    // Trigger SVC to return to EL1
     unsafe { asm!("svc #0x10") };
-
-    unreachable!();
     loop {}
 }

@@ -180,7 +180,7 @@ impl GIC400 {
             (*gicc).ctlr.zero();
             (*gicd).ctlr.zero();
 
-            (*gicd).ctlr.write(0x2);
+            (*gicd).ctlr.write(0b11);
         }
     }
 
@@ -190,7 +190,7 @@ impl GIC400 {
 
         unsafe {
             (*gicd).igroupr[0].write(0xFFFF_FFFF);
-            (*gicc).ctlr.write(0b110);
+            (*gicc).ctlr.write(0b1);
 
             (*gicc).pmr.write(0xFF);
             (*gicc).bpr.zero();

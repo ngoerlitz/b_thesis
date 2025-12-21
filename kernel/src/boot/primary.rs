@@ -1,17 +1,18 @@
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
 use crate::actor::runtime::handler::RuntimeHandler;
-use crate::boot::allocator::init_heap;
 use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER};
 use crate::boot::secondary::kernel_secondary;
-use crate::boot::{CpuBootInformation, KSTACK_01_TOP, KSTACK_02_TOP, KSTACK_03_TOP, MAILBOX_TOP};
+use crate::boot::{
+    CpuBootInformation, KSTACK_01_TOP, KSTACK_02_TOP, KSTACK_03_TOP, MAILBOX_TOP, allocator,
+};
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::test::kernel_func;
-use crate::{bsp, kprintln};
+use crate::{bsp, drivers, kprintln};
 use alloc::sync::Arc;
 use core::arch::asm;
 use core::fmt::{Debug, Formatter};
@@ -91,9 +92,14 @@ fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
     (info_base as u64, sp_aligned as u64)
 }
 
-pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
-    init_heap();
-    init_mailboxes();
+pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(dtb: *const u8, actor: A) {
+    unsafe {
+        drivers::mmu::init_page_tables();
+        drivers::mmu::init_user_page_tables();
+        drivers::mmu::enable_mmu_el1();
+    }
+
+    allocator::init_heap();
 
     let x = RootEnvironment::new(
         FutureRuntime::new(RuntimeHandler::default()).unwrap(),

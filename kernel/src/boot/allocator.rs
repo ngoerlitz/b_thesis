@@ -11,10 +11,9 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 pub fn init_heap() {
     unsafe {
-        let start = HEAP_START();
-        let end = HEAP_END();
+        let start = 0x40004700usize;
+        let heap_size = 0x7d000;
 
-        let heap_size = end - start;
         ALLOCATOR.lock().init(start as *mut u8, heap_size);
     }
 }

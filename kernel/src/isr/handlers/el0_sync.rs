@@ -11,10 +11,10 @@ use core::slice;
 unsafe extern "C" fn el0_sys_write(ctx: *const ISRContext) {
     // Defensive cap to avoid unbounded spam if EL0 passes a huge length.
 
-    unsafe {
-        let slice = slice::from_raw_parts((*ctx).x0 as *const u8, (*ctx).x1 as usize);
-        kprintln!("User: {}", str::from_utf8_unchecked(slice));
-    }
+    kprintln!("x0: {:#X} -- x1: {:#X}", (*ctx).x[0], (*ctx).x[1]);
+
+    let slice = slice::from_raw_parts((*ctx).x[0] as *const u8, (*ctx).x[1] as usize);
+    kprintln!("User: {}", str::from_utf8_unchecked(slice));
 }
 
 #[unsafe(no_mangle)]
@@ -103,70 +103,6 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
         }
     }
 }
-//
-// #[unsafe(no_mangle)]
-// #[unsafe(naked)]
-// #[rustfmt::skip]
-// pub unsafe extern "C" fn el0_sync() -> ! {
-//     // This also handles SVC -> therefore needed to handle EL0 -> EL1 transition
-//
-//     naked_asm!(
-//         "msr DAIFSet, #0b1111",
-//         "mrs x9, ESR_EL1",
-//         "ubfx x10, x9, #26, #6", // EC
-//         "cmp x10, #0x15",
-//         "b.ne el0_handler", // not SVC -> default handler
-//         // noreturn
-//
-//         // Check for 0x20 -> uart_write
-//         "and x11, x9, 0xFFFF",
-//         "cmp x11, 0x20",
-//         "b.ne 1f",
-//         "sub sp, sp, #256",
-//         "bl el0_sys_write",
-//         "add sp, sp, #256",
-//         "eret",
-//
-//         // Check for 0x10 -> EL0 -> EL1
-//         "1:",
-//         "and x11, x9, #0xFFFF",
-//         "cmp x11, #0x10",
-//         "b.ne el0_handler",
-//         "ldr x0, [sp, #16 * 17]", // x2 = x_ptr
-//         "ldr w3, [x0]",           // *x2
-//         "add w3, w3, #1",
-//         "str w3, [x0]",
-//         "dsb ishst",
-//         "isb",
-//
-//         // Restore registers
-//         "ldp x2, x3,   [sp, #16 * 1]",
-//         "ldp x4, x5,   [sp, #16 * 2]",
-//         "ldp x6, x7,   [sp, #16 * 3]",
-//         "ldp x8, x9,   [sp, #16 * 4]",
-//         "ldp x10, x11, [sp, #16 * 5]",
-//         "ldp x12, x13, [sp, #16 * 6]",
-//         "ldp x14, x15, [sp, #16 * 7]",
-//         "ldp x16, x17, [sp, #16 * 8]",
-//         "ldp x18, x19, [sp, #16 * 9]",
-//         "ldp x20, x21, [sp, #16 * 10]",
-//         "ldp x22, x23, [sp, #16 * 11]",
-//         "ldp x24, x25, [sp, #16 * 12]",
-//         "ldp x26, x27, [sp, #16 * 13]",
-//         "ldp x28, x29, [sp, #16 * 14]",
-//         "ldr x30, [sp, #16 * 16]",
-//         "mov x0, #(1<<9 | 1<<8 | 0<<7 | 1<<6 | 0b0101)", // DAIF = 1111, M=EL1h,
-//         "msr SPSR_EL1, x0",
-//         "msr ELR_EL1, x30",
-//
-//         // Since we clobbered x1 in the mov call above, we need to load them down here.
-//         "ldp x0, x1,   [sp, #16 * 0]",
-//         "add sp, sp, #288",
-//
-//         // Return
-//         "eret",
-//     )
-// }
 
 const OFF_SAVED_SP: usize = 0x00;
 const OFF_X19: usize = 0x08;

@@ -1,6 +1,4 @@
 /*
-* el.S; 20.08.2025; Nikolas Görlitz
-*
 * The AArch64 arch has 4 exception levels, of which the upper two (EL3, EL2) are optionally
 * implemented. Typically, EL3 is used for firmware, whereas EL2 is used for virtualization.
 * Since we don't require either, we are going to drop from the current ELx down to EL1 and
@@ -16,4 +14,4 @@
 .globl _el1
 
 _el1:
-    b _kmain
+    b _setup
