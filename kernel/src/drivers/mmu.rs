@@ -1,6 +1,4 @@
-#![no_std]
-#![no_main]
-#![feature(asm_experimental_arch)]
+#![allow(warnings)] // Temporary until rewrite
 
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;

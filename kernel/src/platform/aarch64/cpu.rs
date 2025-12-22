@@ -50,7 +50,7 @@ pub fn get_sp() -> u64 {
 
 pub fn enable_irq() {
     unsafe {
-        asm!("msr daifclr, #0b111");
+        asm!("msr daifclr, #0b1111");
     }
 }
 

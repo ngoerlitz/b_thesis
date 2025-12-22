@@ -7,15 +7,36 @@
 #![no_std]
 #![no_main]
 
-use zcene_core::actor::{Actor, ActorEnvironment, ActorCreateError, ActorDestroyError};
+mod receiver;
+
+extern crate alloc;
+
+use crate::receiver::ReceivingActor;
+use alloc::format;
+use alloc::string::String;
 use kernel::actor::env::root::environment::RootEnvironment;
+use kernel::boot::global::ACTOR_ROOT_ENVIRONMENT;
 use kernel::{bootstrap_system, kprintln};
+use zcene_core::actor::{
+    Actor, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentSpawn,
+    ActorFuture, ActorHandleError, ActorMessageSender,
+};
 
 #[derive(Default)]
-pub struct RootActor;
+pub struct RootActor {
+    id: usize,
+}
 
-#[derive(Clone)]
-pub enum RootActorMessage {}
+impl RootActor {
+    fn new(id: usize) -> Self {
+        Self { id }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum RootActorMessage {
+    String(String),
+}
 
 impl Actor<RootEnvironment> for RootActor {
     type Message = RootActorMessage;
@@ -24,7 +45,12 @@ impl Actor<RootEnvironment> for RootActor {
         &'a mut self,
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
-        kprintln!("This is a test of the new actor system. Please tell me this thing works!");
+        let new_actor = ReceivingActor::default();
+
+        let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };
+
+        addr.send(format!("Hello World, this is a message from {}!", self.id).into())
+            .await;
 
         Ok(())
     }

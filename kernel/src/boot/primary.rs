@@ -6,10 +6,12 @@ use crate::boot::secondary::kernel_secondary;
 use crate::boot::{
     CpuBootInformation, KSTACK_01_TOP, KSTACK_02_TOP, KSTACK_03_TOP, MAILBOX_TOP, allocator,
 };
+use crate::bsp::constants::IRQ_UART0;
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, IrqType};
+use crate::hal::serial::SerialDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::test::kernel_func;
 use crate::{bsp, drivers, kprintln};
@@ -92,6 +94,9 @@ fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
     (info_base as u64, sp_aligned as u64)
 }
 
+pub static UART0: spin::mutex::Mutex<PL011> =
+    spin::mutex::Mutex::new(unsafe { PL011::new(bsp::constants::UART0_BASE) });
+
 pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(dtb: *const u8, actor: A) {
     unsafe {
         drivers::mmu::init_page_tables();
@@ -127,6 +132,23 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(dtb: *const u8, actor: 
             timer.reset();
         });
 
+        {
+            UART0.lock().enable().unwrap();
+            UART0.lock().enable_interrupt();
+        }
+
+        irq.enable_irq(IrqType::from(IRQ_UART0), Some(CpuTarget::Zero));
+        irq.set_irq_handler(IrqType::from(bsp::constants::IRQ_UART0), |_| {
+            let char = UART0.lock().read_byte();
+
+            match char {
+                Ok(c) => {
+                    kprintln!("Received: {}", c as char);
+                }
+                Err(_) => kprintln!("Error reading"),
+            }
+        });
+
         let timer = get_cpu_timer();
         timer.init();
         timer.set_interval(Duration::from_millis(100));
@@ -143,13 +165,10 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(dtb: *const u8, actor: 
 
     cpu::enable_irq();
 
-    kernel_func();
+    let _ = RootEnvironment::get().spawn(actor).unwrap();
+    RootEnvironment::get().enter();
 
     loop {}
-
-    // let _ = RootEnvironment::get().spawn(actor).unwrap();
-    //
-    // RootEnvironment::get().enter();
 
     /*
         unsafe {

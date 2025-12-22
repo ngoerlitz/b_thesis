@@ -109,7 +109,7 @@ pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
                 el0_stack_top = in(reg) el0_sp,
                 user_func_ptr = in(reg) user_fp,
                 xptr         = in(reg) x_ptr,
-                core_id      = in(reg) cpuid,
+                core_id      = in(reg) cpuid as u64,
 
                 out("x9") _,
 

@@ -20,6 +20,8 @@ extern "C" fn el0_irq(ctx: &mut ISRContext) {
         irq_num
     );
 
+    loop {}
+
     irq_svc.dispatch(irq_num.into(), ctx);
 
     GIC400::write_eoir(iar);

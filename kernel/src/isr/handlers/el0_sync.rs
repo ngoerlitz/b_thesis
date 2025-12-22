@@ -7,20 +7,13 @@ use core::arch::{asm, naked_asm};
 use core::ptr::addr_of;
 use core::slice;
 
-#[unsafe(no_mangle)]
-unsafe extern "C" fn el0_sys_write(ctx: *const ISRContext) {
-    // Defensive cap to avoid unbounded spam if EL0 passes a huge length.
+fn el0_sys_write(ctx: *const ISRContext) {
+    unsafe {
+        kprintln!("x0: {:#X} -- x1: {:#X}", (*ctx).x[0], (*ctx).x[1]);
 
-    kprintln!("x0: {:#X} -- x1: {:#X}", (*ctx).x[0], (*ctx).x[1]);
-
-    let slice = slice::from_raw_parts((*ctx).x[0] as *const u8, (*ctx).x[1] as usize);
-    kprintln!("User: {}", str::from_utf8_unchecked(slice));
-}
-
-#[unsafe(no_mangle)]
-extern "C" fn print_test(val: u64) -> ! {
-    kprintln!("Val: {:X}", val);
-    loop {}
+        let slice = slice::from_raw_parts((*ctx).x[0] as *const u8, (*ctx).x[1] as usize);
+        kprintln!("User: {}", str::from_utf8_unchecked(slice));
+    }
 }
 
 const EC_SVC64: u64 = 0x15;
@@ -29,11 +22,13 @@ const EC_SVC64: u64 = 0x15;
 pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Context) {
     // Read ESR_EL1
     let esr: u64;
-    asm!(
+    unsafe {
+        asm!(
         "mrs {0}, ESR_EL1",
         out(reg) esr,
         options(nomem, preserves_flags, nostack),
-    );
+        );
+    }
 
     let ec = (esr >> 26) & 0x3f;
 
@@ -53,20 +48,27 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
             //
             // kprintln!("CTX: {:X} | CTX_EL1: {:X}", ctx as u64, ctx_el1 as u64);
             //
-            let mut x: *mut i32 = (*ctx_el1).xptr as *mut i32;
+            let mut x: *mut i32 = unsafe { (*ctx_el1).xptr as *mut i32 };
 
-            kprintln!("Pointer: {:X} | Value: {}", x as u64, x.read_volatile());
+            kprintln!("Pointer: {:X} | Value: {}", x as u64, unsafe {
+                x.read_volatile()
+            });
 
-            *x += 1;
+            unsafe {
+                *x += 1;
+            }
 
             let mut y: u64 = 0;
-            asm!(
-            "ldr {}, [{}, #16 * 16]" // x2 = x_ptr
-            , out(reg) y, in(reg) ctx_el1, options(nostack, preserves_flags));
+            unsafe {
+                asm!(
+                "ldr {}, [{}, #16 * 16]" // x2 = x_ptr
+                , out(reg) y, in(reg) ctx_el1, options(nostack, preserves_flags));
+            }
 
             kprintln!("RETURN_ADDR: 0x{:x}", (y));
 
-            asm!(
+            unsafe {
+                asm!(
                 "ldp x2, x3,   [x1, #16 * 1]",
                 "ldp x4, x5,   [x1, #16 * 2]",
                 "ldp x6, x7,   [x1, #16 * 3]",
@@ -81,22 +83,18 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
                 "ldp x24, x25, [x1, #16 * 12]",
                 "ldp x26, x27, [x1, #16 * 13]",
                 "ldp x28, x29, [x1, #16 * 14]",
-
                 "mov x0, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",   // D A I F + EL1h
                 "msr SPSR_EL1, x0",
-
                 "ldr x30, [x1, #16 * 16]",
                 "msr ELR_EL1, x30",
-
                 "ldr x30, [x1, #16 * 17]",
                 "ldp x0, x1, [sp, #16 * 0]",
-
                 "mov sp, x30",
                 "eret",
-
                 in("x1") (ctx_el1 as u64),
                 options(noreturn),
-            );
+                );
+            }
         }
         _ => {
             el0_handler();

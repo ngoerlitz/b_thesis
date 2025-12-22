@@ -180,7 +180,20 @@ impl GIC400 {
             (*gicc).ctlr.zero();
             (*gicd).ctlr.zero();
 
-            (*gicd).ctlr.write(0b11);
+            /// This line enables GICD_CTLR.EnableGrp0 on QEMU (since it doesn't correctly
+            /// emulate NS/S). On the hardware, since we are in EL1NS (EL1h), this bit controls
+            /// Group 1 interrupts, since it is aliased for the NS view!
+            (*gicd).ctlr.write(0b1);
+
+            /// We need to set the igroupr[0] (PPIs) to 0, since we want all IRQs to happen
+            /// in Group 0 on QEMU!
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "qemu")] {
+                    (*gicd).igroupr[0].zero();
+                } else {
+                    (*gicd).igroupr[0].write(0xFFFF_FFFF);
+                }
+            }
         }
     }
 
@@ -189,10 +202,8 @@ impl GIC400 {
         let gicc = self.gicc.as_ptr();
 
         unsafe {
-            (*gicd).igroupr[0].write(0xFFFF_FFFF);
             (*gicc).ctlr.write(0b1);
-
-            (*gicc).pmr.write(0xFF);
+            (*gicc).pmr.write(0b111);
             (*gicc).bpr.zero();
 
             (*gicd).isenabler[0].write(1 << PPI30_CNTPNSIRQ);
@@ -259,10 +270,19 @@ impl IrqDriver for GIC400 {
                 (*gicd).itargetsr[n].modify(|v| (v & !(mask)) | (cpubits << offset));
 
                 let (n, offset) = Self::compute_igroupr_offset(idx);
-                (*gicd).igroupr[n].enable_bit(offset);
 
                 (*gicd).icpendr[n].enable_bit(offset);
                 (*gicd).icactiver[n].enable_bit(offset);
+
+                /// Once again, we need our IRQs to be Group0 for QEMU whilst the actual
+                /// hardware requires Group1.
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "qemu")] {
+                        (*gicd).igroupr[n].clear_bit(offset);
+                    } else {
+                        (*gicd).igroupr[n].enable_bit(offset);
+                    }
+                }
 
                 (*gicd).isenabler[n].enable_bit(offset);
             },

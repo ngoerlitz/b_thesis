@@ -6,9 +6,12 @@
 .globl _setup
 
 .section .text._start
+
+.extern _park_secondary
 .extern _el3
 
 _start:
+    bl _park_secondary
     b _el3
 1:
     wfe

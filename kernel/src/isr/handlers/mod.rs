@@ -1,5 +1,6 @@
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::drivers::gic400::GIC400;
+use crate::kprintln;
 use crate::platform::aarch64::cpu;
 use crate::services::irq_manager::IrqManagerService;
 use spin::RwLockReadGuard;
@@ -18,7 +19,7 @@ fn setup_isr() -> (
     u8,
 ) {
     let irq_manager = RootEnvironment::get().irq_manager().read();
-    let (iar, irq_num) = GIC400::irq_info();
+    let (mut iar, mut irq_num) = GIC400::irq_info();
     let core_id = cpu::cpuid();
 
     (irq_manager, iar, irq_num, core_id)
