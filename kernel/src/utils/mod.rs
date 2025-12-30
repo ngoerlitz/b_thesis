@@ -1,3 +1,4 @@
 pub(crate) mod get_set;
+pub(crate) mod memory;
 pub mod print;
-mod regs;
+pub(crate) mod regs;

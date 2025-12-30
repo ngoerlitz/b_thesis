@@ -41,8 +41,8 @@ macro_rules! linker_symbols {
 macro_rules! bootstrap_system {
     ($actor: expr) => {
         #[unsafe(no_mangle)]
-        fn __kernel_entry(dtb: *const u8) {
-            kernel::boot::primary::kernel_main(dtb, $actor);
+        fn __kernel_entry() {
+            kernel::boot::primary::kernel_main($actor);
 
             loop {}
         }

@@ -3,7 +3,7 @@ use crate::boot::global::IRQ_MANAGER;
 use crate::drivers::gic400::GIC400;
 use crate::hal::irq::InterruptController;
 use crate::hal::timer::SystemTimerDriver;
-use crate::isr::ISRContext;
+use crate::isr::context::ISRContext;
 use crate::isr::el::ExceptionLevel;
 use crate::kprintln;
 use crate::platform::aarch64::{cpu, get_cpu_timer};

@@ -1,5 +1,6 @@
 use crate::actor::env::user::address::UserAddress;
 use crate::actor::env::user::ctx::UserEnvironmentHandleCtx;
+use core::fmt::Debug;
 use zcene_core::actor::{Actor, ActorEnvironment, ActorMessage};
 
 pub struct UserEnvironment;

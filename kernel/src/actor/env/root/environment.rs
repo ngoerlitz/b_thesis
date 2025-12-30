@@ -2,6 +2,9 @@ use crate::actor::env::root::ctx::{
     RootEnvironmentCreateCtx, RootEnvironmentDestroyCtx, RootEnvironmentHandleCtx,
 };
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
+use crate::actor::env::user::address::UserAddress;
+use crate::actor::env::user::environment::UserEnvironment;
+use crate::actor::env::user::executor::UserExecutor;
 use crate::actor::runtime::handler::RuntimeHandler;
 use crate::boot::global;
 use crate::drivers::gic400::GIC400;
@@ -10,7 +13,11 @@ use crate::getter;
 use crate::hal::serial::SerialDriver;
 use crate::services::irq_manager::IrqManagerService;
 use alloc::alloc::Global;
+use alloc::boxed::Box;
 use alloc::sync::Arc;
+use core::alloc::Allocator;
+use core::fmt::Debug;
+use core::marker::PhantomData;
 use spin::RwLock;
 use zcene_core::actor::{
     Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference,
@@ -19,20 +26,19 @@ use zcene_core::actor::{
 };
 use zcene_core::future::runtime::{FutureRuntimeHandler, FutureRuntimeReference};
 
-pub struct RootEnvironment<H = RuntimeHandler, L = PL011>
+pub struct RootEnvironment<H = RuntimeHandler>
 where
     H: FutureRuntimeHandler,
-    L: SerialDriver,
 {
     future_runtime: FutureRuntimeReference<H>,
-    logger: ActorRootLoggerService<L>,
+    logger: ActorRootLoggerService<PL011>,
     irq_manager: RwLock<IrqManagerService<GIC400, 216>>,
 }
 
-impl<H: FutureRuntimeHandler, L: SerialDriver> RootEnvironment<H, L> {
+impl<H: FutureRuntimeHandler> RootEnvironment<H> {
     pub fn new(
         future_runtime: FutureRuntimeReference<H>,
-        logger: ActorRootLoggerService<L>,
+        logger: ActorRootLoggerService<PL011>,
     ) -> Self {
         Self {
             future_runtime,
@@ -42,13 +48,38 @@ impl<H: FutureRuntimeHandler, L: SerialDriver> RootEnvironment<H, L> {
     }
 
     getter!(future_runtime: FutureRuntimeReference<H> as runtime);
-    getter!(logger: ActorRootLoggerService<L>);
+    getter!(logger: ActorRootLoggerService<PL011>);
     getter!(irq_manager: RwLock<IrqManagerService<GIC400, 216>>);
 
     pub fn enter(&self) -> Result<(), ActorEnterError> {
         self.future_runtime.run();
 
         Ok(())
+    }
+
+    pub fn spawn_user<A: Actor<UserEnvironment>>(
+        self: &ActorEnvironmentReference<Self>,
+        mut actor: A,
+    ) -> Result<<UserEnvironment as ActorEnvironment>::Address<A>, ActorSpawnError>
+    where
+        A::Message: Debug,
+    {
+        let (sender, receiver) = ActorMessageChannel::<A::Message>::new_unbounded();
+        let allocator = self.allocator().clone();
+
+        self.future_runtime.spawn(async {
+            UserExecutor::<_, H>::new(
+                allocator,
+                Box::new(actor),
+                receiver,
+                None,
+                PhantomData::default(),
+            )
+            .run()
+            .await
+        });
+
+        Ok(UserAddress::new(12, PhantomData::default()))
     }
 }
 
@@ -98,7 +129,7 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
     }
 }
 
-impl RootEnvironment<RuntimeHandler, PL011> {
+impl RootEnvironment<RuntimeHandler> {
     pub fn get() -> &'static ActorEnvironmentReference<Self> {
         unsafe {
             // SAFETY

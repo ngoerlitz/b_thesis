@@ -1,5 +1,6 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::timer::SystemTimerDriver;
+use crate::isr::Svc;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::{kprintln, save_gp_regs};
 use alloc::format;
@@ -136,7 +137,8 @@ pub fn print_kernel_data(x: &mut i32, y: &i32, z: &String) {
 fn sys_write(buf: *const u8, len: usize) {
     unsafe {
         asm!(
-        "svc #0x20",
+        "svc #{svc}",
+        svc = const Svc::PrintMsg as u16,
         in("x0") buf,
         in("x1") len,
         options(nostack, preserves_flags)
@@ -290,6 +292,6 @@ pub extern "C" fn user_func(cpu_id: u8) {
     let (p, n) = buf_ptr_len(&b);
     sys_write(p, n);
 
-    unsafe { asm!("svc #0x10") };
+    unsafe { asm!("svc #{svc}", svc = const Svc::ReturnEl1 as u16) };
     loop {}
 }

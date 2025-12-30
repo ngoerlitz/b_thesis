@@ -16,5 +16,5 @@ pub static IRQ_MANAGER: RwLock<IrqManagerService<GIC400, 216>> =
     RwLock::new(IrqManagerService::new(GIC400::new()));
 
 pub static ACTOR_ROOT_ENVIRONMENT: SyncUnsafeCell<
-    MaybeUninit<Arc<RootEnvironment<RuntimeHandler, PL011>>>,
+    MaybeUninit<Arc<RootEnvironment<RuntimeHandler>>>,
 > = SyncUnsafeCell::new(MaybeUninit::uninit());

@@ -8,13 +8,16 @@
 #![no_main]
 
 mod receiver;
+mod user;
 
 extern crate alloc;
 
 use crate::receiver::ReceivingActor;
+use crate::user::UserActor;
 use alloc::format;
 use alloc::string::String;
 use kernel::actor::env::root::environment::RootEnvironment;
+use kernel::actor::env::user::environment::UserEnvironment;
 use kernel::boot::global::ACTOR_ROOT_ENVIRONMENT;
 use kernel::{bootstrap_system, kprintln};
 use zcene_core::actor::{
@@ -46,6 +49,14 @@ impl Actor<RootEnvironment> for RootActor {
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
         let new_actor = ReceivingActor::default();
+
+        let user_addr = unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserActor::default())
+                .unwrap()
+        };
+
+        user_addr.send(3);
 
         let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };
 

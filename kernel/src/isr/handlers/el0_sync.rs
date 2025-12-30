@@ -1,6 +1,7 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
-use crate::isr::{EL1Context, ISRContext};
+use crate::isr::Svc;
+use crate::isr::context::{EL1Context, ISRContext};
 use crate::kprintln;
 use crate::platform::aarch64::cpu;
 use core::arch::{asm, naked_asm};
@@ -40,11 +41,11 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
 
     kprintln!("SVC: {}", svc_num);
 
-    match svc_num {
-        0x20 => {
+    match Svc::from(svc_num) {
+        Svc::PrintMsg => {
             el0_sys_write(ctx);
         }
-        0x10 => {
+        Svc::ReturnEl1 => {
             //
             // kprintln!("CTX: {:X} | CTX_EL1: {:X}", ctx as u64, ctx_el1 as u64);
             //
@@ -95,6 +96,9 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
                 options(noreturn),
                 );
             }
+        }
+        Svc::SendMsg => {
+            unimplemented!();
         }
         _ => {
             el0_handler();

@@ -1,6 +1,6 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
-use crate::isr::ISRContext;
+use crate::isr::context::ISRContext;
 use crate::kprintln;
 use crate::platform::aarch64::registers::esr_el1::ESR_EL1;
 use crate::platform::aarch64::registers::far_el1::FAR_EL1;

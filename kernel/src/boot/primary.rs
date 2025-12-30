@@ -12,9 +12,10 @@ use crate::hal::driver::Driver;
 use crate::hal::irq::InterruptController;
 use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::hal::serial::SerialDriver;
+use crate::hal::timer::SystemTimerDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::test::kernel_func;
-use crate::{bsp, drivers, kprintln};
+use crate::{bsp, drivers, kprintln, test};
 use alloc::sync::Arc;
 use core::arch::asm;
 use core::fmt::{Debug, Formatter};
@@ -97,7 +98,7 @@ fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
 pub static UART0: spin::mutex::Mutex<PL011> =
     spin::mutex::Mutex::new(unsafe { PL011::new(bsp::constants::UART0_BASE) });
 
-pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(dtb: *const u8, actor: A) {
+pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
     unsafe {
         drivers::mmu::init_page_tables();
         drivers::mmu::init_user_page_tables();
@@ -164,6 +165,9 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(dtb: *const u8, actor: 
     }
 
     cpu::enable_irq();
+
+    // kernel_func();
+    // loop {}
 
     let _ = RootEnvironment::get().spawn(actor).unwrap();
     RootEnvironment::get().enter();

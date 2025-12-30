@@ -1,4 +1,8 @@
 use crate::actor::env::user::environment::UserEnvironment;
+use crate::isr::Svc;
+use crate::kprintln;
+use crate::platform::aarch64::cpu::current_el;
+use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
 use kernel_derive::Constructor;
 use zcene_core::actor::{Actor, ActorAddress, ActorFuture, ActorMessageSender, ActorSendError};
@@ -19,8 +23,27 @@ impl<A: Actor<UserEnvironment>> ActorAddress<A, UserEnvironment> for UserAddress
 
 impl<A: Actor<UserEnvironment>> ActorMessageSender<A::Message> for UserAddress<A> {
     fn send(&self, message: A::Message) -> impl ActorFuture<'_, Result<(), ActorSendError>> {
-        // TODO
+        kprintln!("UserAddress::send");
 
-        async move { Ok(()) }
+        if current_el() == "EL1" {
+            panic!("Can't use the UserAddress::send in EL1")
+        }
+
+        async move {
+            let msg_ptr = &message as *const A::Message as usize;
+
+            unsafe {
+                core::arch::asm!(
+                    "svc #{svc}",
+                    svc = const Svc::PrintMsg as u16,
+                    in("x0") 3,
+                    in("x1") 0,
+                    in("x2") msg_ptr,
+                    options(nostack)
+                )
+            }
+
+            Ok(())
+        }
     }
 }
