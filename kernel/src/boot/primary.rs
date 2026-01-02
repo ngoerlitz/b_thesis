@@ -14,8 +14,7 @@ use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::hal::serial::SerialDriver;
 use crate::hal::timer::SystemTimerDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::test::kernel_func;
-use crate::{bsp, drivers, kprintln, test};
+use crate::{bsp, drivers, kprintln, user};
 use alloc::sync::Arc;
 use core::arch::asm;
 use core::fmt::{Debug, Formatter};
@@ -153,7 +152,7 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
         let timer = get_cpu_timer();
         timer.init();
         timer.set_interval(Duration::from_millis(100));
-        let _ = timer.enable();
+        // let _ = timer.enable();
 
         for _ in 0..100_000 {
             unsafe { asm!("nop") }
@@ -166,8 +165,8 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
 
     cpu::enable_irq();
 
-    // kernel_func();
-    // loop {}
+    user::test::kernel_func();
+    loop {}
 
     let _ = RootEnvironment::get().spawn(actor).unwrap();
     RootEnvironment::get().enter();

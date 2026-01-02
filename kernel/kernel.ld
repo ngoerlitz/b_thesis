@@ -24,17 +24,25 @@ SECTIONS
     /***********************************************************************************************
     * Code + RO Data + Global Offset Table
     ***********************************************************************************************/
-    .text :
+    .text._start :
     {
         KEEP(*(.text._start))
-        *(.text._start_arguments) /* Constants (or statics in Rust speak) read by _start(). */
-        *(.text._start_rust)      /* The Rust entry point */
+    }
+
+    . = ALIGN(0x200000);
+    .text : {
+        __kernel_text_start = .;
         *(.text*)                 /* Everything else */
+        . = ALIGN(0x200000);
+        __kernel_text_end = .;
     }
 
     .rodata : ALIGN(8)
     {
+        __kernel_rodata_start = .;
         *(.rodata*)
+        . = ALIGN(0x200000);
+        __kernel_rodata_end = .;
     }
 
     /***********************************************************************************************
@@ -42,7 +50,10 @@ SECTIONS
     ***********************************************************************************************/
     .data :
     {
+        __kernel_data_start = .;
         *(.data*)
+        . = ALIGN(0x200000);
+        __kernel_data_end = .;
     }
 
     /* Section is zeroed in pairs of u64. Align start and end to 16 bytes */
@@ -65,37 +76,37 @@ SECTIONS
 
     /DISCARD/ : { *(.comment*) }
 
-        /***********************************************************************************************
-        * User image (EL0) - keep contiguous and 2MiB-aligned for single L2 block mapping
-        ***********************************************************************************************/
+    /***********************************************************************************************
+    * User image (EL0) - keep contiguous and 2MiB-aligned for single L2 block mapping
+    ***********************************************************************************************/
 
-        /* Start of the user-mapped region: MUST be 2MiB aligned */
-        . = ALIGN(0x200000);
-        __user_start = .;
+    /* Start of the user-mapped region: MUST be 2MiB aligned */
+    . = ALIGN(0x200000);
+    __user_start = .;
 
-        /* User code */
-        .user_text : ALIGN(16)
-        {
-            __user_text_start = .;
-            KEEP(*(.user_text .user_text.*))
-            __user_text_end = .;
-        }
+    /* User code */
+    .user_text : ALIGN(16)
+    {
+        __user_text_start = .;
+        KEEP(*(.user_text .user_text.*))
+        __user_text_end = .;
+    }
 
-        .user_stack (NOLOAD) : ALIGN(16)
-        {
-            __ustack_start = .;
-            . = . + (USTACK_SIZE * NUM_USTACKS);
-            __ustack_end = .;
-        }
+    .user_stack (NOLOAD) : ALIGN(16)
+    {
+        __ustack_start = .;
+        . = . + (USTACK_SIZE * NUM_USTACKS);
+        __ustack_end = .;
+    }
 
-        __stack_el0_top = __ustack_end;
+    __stack_el0_top = __ustack_end;
 
-        /* If you want to map EXACTLY one 2MiB L2 block:
-           pad the end to the next 2MiB boundary and export __user_end.
-           Then map [__user_start, __user_end) as one 2MiB block. */
-        . = ALIGN(0x200000);
-        __user_end = .;
+    /* If you want to map EXACTLY one 2MiB L2 block:
+       pad the end to the next 2MiB boundary and export __user_end.
+       Then map [__user_start, __user_end) as one 2MiB block. */
+    . = ALIGN(0x200000);
+    __user_end = .;
 
-        /* Safety: ensure the whole user image fits in a single 2MiB block */
-        ASSERT((__user_end - __user_start) <= 0x200000, "User image exceeds 2MiB")
+    /* Safety: ensure the whole user image fits in a single 2MiB block */
+    ASSERT((__user_end - __user_start) <= 0x200000, "User image exceeds 2MiB")
 }

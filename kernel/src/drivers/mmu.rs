@@ -49,6 +49,7 @@ const SH_INNER_SHAREABLE: u64 = 0b11;
 /// Access Permissions AP[2:1] (stage 1):
 const AP_EL1_RW_EL0_NO: u64 = 0b00;
 const AP_EL1_RW_EL0_RW: u64 = 0b01;
+const AP_EL1_RO_EL0_RO: u64 = 0b11;
 
 /// Descriptor bit positions for stage-1 block/table descriptors (4 KiB granule).
 const DESC_VALID: u64 = 1 << 0;
@@ -152,24 +153,85 @@ pub unsafe fn init_page_tables() {
         // Identity mapping VA → PA.
         let pa = va;
 
-        let (attr_index, sh, pxn, uxn) = if is_mmio {
-            // Device-nGnRE, outer shareable, non-exec.
-            (ATTR_INDEX_DEVICE, SH_OUTER_SHAREABLE, true, true)
+        let ktext_start = KERNEL_TEXT_START();
+        let ktext_end = KERNEL_TEXT_END();
+        let krodata_start = KERNEL_RODATA_START();
+        let krodata_end = KERNEL_RODATA_END();
+        let kdata_start = KERNEL_DATA_START();
+        let kdata_end = KERNEL_DATA_END();
+
+        let vau = va as usize;
+        let is_ktext = vau >= ktext_start && vau < ktext_end;
+        let is_krodata = vau >= krodata_start && vau < krodata_end;
+        let is_kdata = vau >= kdata_start && vau < kdata_end;
+        let is_boot0 = vau < 0x200000;
+
+        let (attr_index, sh, ap, pxn, uxn) = if is_mmio {
+            (
+                ATTR_INDEX_DEVICE,
+                SH_OUTER_SHAREABLE,
+                AP_EL1_RW_EL0_NO,
+                true,
+                true,
+            )
+        } else if is_ktext {
+            (
+                ATTR_INDEX_NORMAL,
+                SH_INNER_SHAREABLE,
+                AP_EL1_RO_EL0_RO,
+                false,
+                false,
+            ) // ROX shared
+        } else if is_krodata {
+            (
+                ATTR_INDEX_NORMAL,
+                SH_INNER_SHAREABLE,
+                AP_EL1_RO_EL0_RO,
+                true,
+                true,
+            ) // RO, XN
+        } else if is_kdata {
+            (
+                ATTR_INDEX_NORMAL,
+                SH_INNER_SHAREABLE,
+                AP_EL1_RW_EL0_RW,
+                true,
+                true,
+            ) // EL1 RW, XN
+        } else if is_boot0 {
+            (
+                ATTR_INDEX_NORMAL,
+                SH_INNER_SHAREABLE,
+                AP_EL1_RW_EL0_RW,
+                false,
+                true,
+            ) // EL1 X ok, EL0 XN
         } else {
-            // Normal WB WA, inner shareable, executable (tune to taste).
-            (ATTR_INDEX_NORMAL, SH_INNER_SHAREABLE, false, false)
+            (
+                ATTR_INDEX_NORMAL,
+                SH_INNER_SHAREABLE,
+                AP_EL1_RW_EL0_RW,
+                false,
+                false,
+            ) // your default
         };
 
         let l1_index = block_idx / 512; // 512 × 2 MiB = 1 GiB per L2 table
         let l2_index = block_idx % 512;
 
         let l2_table = l2_table_for_l1_index(l1_index);
-        (*l2_table).0[l2_index] =
-            make_l2_block_desc(pa, attr_index, sh, AP_EL1_RW_EL0_NO, pxn, uxn);
+        (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
     }
 }
 
 linker_symbols! {
+    KERNEL_TEXT_START = __kernel_text_start;
+    KERNEL_TEXT_END   = __kernel_text_end;
+    KERNEL_RODATA_START = __kernel_rodata_start;
+    KERNEL_RODATA_END   = __kernel_rodata_end;
+    KERNEL_DATA_START = __kernel_data_start;
+    KERNEL_DATA_END   = __kernel_data_end;
+
     USER_START = __user_start;
     USER_END   = __user_end;
     USER_STACK = __stack_el0_top;
@@ -183,6 +245,25 @@ pub unsafe fn init_user_page_tables() {
 
     writeln!(writer, "Mapping user code to: {:#X}", user_start_pa);
     writeln!(writer, "USER_STACK_EL0_TOP: {:#X}", USER_STACK());
+
+    writeln!(
+        writer,
+        "KTEXT: [{:X} - {:X}]",
+        KERNEL_TEXT_START(),
+        KERNEL_TEXT_END()
+    );
+    writeln!(
+        writer,
+        "KRODATA: [{:X} - {:X}]",
+        KERNEL_RODATA_START(),
+        KERNEL_RODATA_END()
+    );
+    writeln!(
+        writer,
+        "KDATA: [{:X} - {:X}]",
+        KERNEL_DATA_START(),
+        KERNEL_DATA_END()
+    );
 
     debug_assert_eq!(
         user_start_pa & (L2_BLOCK_SIZE - 1),

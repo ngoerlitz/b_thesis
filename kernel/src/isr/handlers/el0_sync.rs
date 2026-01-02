@@ -62,38 +62,41 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
             let mut y: u64 = 0;
             unsafe {
                 asm!(
-                "ldr {}, [{}, #16 * 16]" // x2 = x_ptr
+                "ldr {}, [{}, #0]" // x2 = x_ptr
                 , out(reg) y, in(reg) ctx_el1, options(nostack, preserves_flags));
             }
 
-            kprintln!("RETURN_ADDR: 0x{:x}", (y));
+            kprintln!("RETURN_ADDR: 0x{:x}", unsafe { &*ctx_el1 }.ret_addr as u64);
+
+            kprintln!("{:?}", unsafe { &*ctx_el1 });
 
             unsafe {
                 asm!(
-                "ldp x2, x3,   [x1, #16 * 1]",
-                "ldp x4, x5,   [x1, #16 * 2]",
-                "ldp x6, x7,   [x1, #16 * 3]",
-                "ldp x8, x9,   [x1, #16 * 4]",
-                "ldp x10, x11, [x1, #16 * 5]",
-                "ldp x12, x13, [x1, #16 * 6]",
-                "ldp x14, x15, [x1, #16 * 7]",
-                "ldp x16, x17, [x1, #16 * 8]",
-                "ldp x18, x19, [x1, #16 * 9]",
-                "ldp x20, x21, [x1, #16 * 10]",
-                "ldp x22, x23, [x1, #16 * 11]",
-                "ldp x24, x25, [x1, #16 * 12]",
-                "ldp x26, x27, [x1, #16 * 13]",
-                "ldp x28, x29, [x1, #16 * 14]",
-                "mov x0, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",   // D A I F + EL1h
-                "msr SPSR_EL1, x0",
-                "ldr x30, [x1, #16 * 16]",
-                "msr ELR_EL1, x30",
-                "ldr x30, [x1, #16 * 17]",
-                "ldp x0, x1, [sp, #16 * 0]",
-                "mov sp, x30",
-                "eret",
-                in("x1") (ctx_el1 as u64),
-                options(noreturn),
+                    // Restore callee-saved regs from EL1Context
+                    "ldp x29, x30, [x1, #32]",
+                    "ldp x27, x28, [x1, #48]",
+                    "ldp x25, x26, [x1, #64]",
+                    "ldp x23, x24, [x1, #80]",
+                    "ldp x21, x22, [x1, #96]",
+                    "ldp x19, x20, [x1, #112]",
+
+                    // Load resume PC and SP
+                    "ldr x2, [x1, #16]",   // ret_addr
+                    "msr ELR_EL1, x2",
+
+                    "ldr x2, [x1, #24]",   // saved_sp
+                    "mov sp, x2",
+
+                    // Return to EL1h (pick DAIF mask as you want; this matches your earlier constant)
+                    "mov x2, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",
+                    "msr SPSR_EL1, x2",
+
+                    "isb",
+                    "eret",
+
+                    in("x1") (ctx_el1 as u64),
+
+                    options(noreturn),
                 );
             }
         }
