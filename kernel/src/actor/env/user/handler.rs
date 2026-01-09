@@ -1,14 +1,18 @@
 use crate::actor::env::user::ctx::UserEnvironmentHandleCtx;
 use crate::actor::env::user::environment::UserEnvironment;
-use crate::utils::memory::leaking_heap_memory_alloc::LeakingHeapMemoryAllocator;
+use crate::utils::memory::leaking_heap_memory_alloc::NoOpMemoryAllocator;
 use alloc::boxed::Box;
 use core::arch::asm;
 use core::pin::pin;
 use core::task::{Context, Poll, Waker};
 use zcene_core::actor::Actor;
+use crate::{svc_call, uprintln};
+use crate::isr::Svc;
 
 pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    let mut actor = unsafe { Box::from_raw_in(actor, LeakingHeapMemoryAllocator) };
+    uprintln!("[USER_HANDLER] CREATE HANDLER!!! A: {:X}", actor as u64);
+
+    let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());
     let mut pinned = pin!(actor.create(()));
@@ -18,20 +22,15 @@ pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *
         Poll::Ready(result) => result,
     };
 
-    unsafe {
-        asm!(
-            // TODO
-            "wfe",
-            options(noreturn)
-        )
-    }
+    svc_call!(Svc::ReturnEl1);
+    unreachable!()
 }
 
 pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
     actor: *mut A,
     msg: &A::Message,
 ) -> ! {
-    let mut actor = unsafe { Box::from_raw_in(actor, LeakingHeapMemoryAllocator) };
+    let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());
     let mut pinned = pin!(actor.handle(UserEnvironmentHandleCtx::new(msg.clone())));
@@ -51,7 +50,9 @@ pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
 }
 
 pub(crate) extern "C" fn user_destroy_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    let mut actor = unsafe { Box::from_raw_in(actor, LeakingHeapMemoryAllocator) };
+    uprintln!("[USER_HANDLER] DESTROY HANDLER!!! A: {:X}", actor as u64);
+
+    let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());
     let mut pinned = pin!(actor.destroy(()));
@@ -61,11 +62,6 @@ pub(crate) extern "C" fn user_destroy_handler<A: Actor<UserEnvironment>>(actor: 
         Poll::Ready(result) => result,
     };
 
-    unsafe {
-        asm!(
-            // TODO
-            "wfe",
-            options(noreturn)
-        )
-    }
+    svc_call!(Svc::ReturnEl1);
+    unreachable!()
 }

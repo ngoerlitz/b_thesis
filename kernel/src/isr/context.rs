@@ -1,3 +1,5 @@
+use crate::actor::env::user::executor_event::UserExecutorEvent;
+
 #[repr(C)]
 pub struct ISRContext {
     pub x: [u64; 30],
@@ -11,7 +13,7 @@ pub struct ISRContext {
 
 #[repr(C)]
 pub struct EL1Context {
-    pub xptr: u64, // {xptr}
+    pub event: *mut Option<UserExecutorEvent>,
     pub pad0: u64, // xzr (always 0)
 
     pub ret_addr: u64, // adr x0, 1f  (saved return address into kernel)
@@ -95,7 +97,7 @@ impl core::fmt::Debug for EL1Context {
         let mut ds = f.debug_struct("EL1Context");
 
         // Metadata / frame header (lowest addresses first, as laid out)
-        ds.field("xptr", &format_args!("{:#018x}", self.xptr));
+        ds.field("event", &format_args!("{:#018x}", self.event as u64));
         ds.field("pad0", &format_args!("{:#018x}", self.pad0));
         ds.field("ret_addr", &format_args!("{:#018x}", self.ret_addr));
         ds.field("saved_sp", &format_args!("{:#018x}", self.saved_sp));

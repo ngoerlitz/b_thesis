@@ -60,9 +60,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
     pub fn spawn_user<A: Actor<UserEnvironment>>(
         self: &ActorEnvironmentReference<Self>,
         mut actor: A,
-    ) -> Result<<UserEnvironment as ActorEnvironment>::Address<A>, ActorSpawnError>
-    where
-        A::Message: Debug,
+    ) -> Result<ActorMessageChannelAddress<A, UserEnvironment>, ActorSpawnError>
     {
         let (sender, receiver) = ActorMessageChannel::<A::Message>::new_unbounded();
         let allocator = self.allocator().clone();
@@ -79,7 +77,11 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
             .await
         });
 
-        Ok(UserAddress::new(12, PhantomData::default()))
+        Ok(
+            ActorMessageChannelAddress::new(
+                sender
+            )
+        )
     }
 }
 

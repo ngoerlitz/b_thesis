@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 kernel = {path = "../kernel"}
-zcene-core = { git = "https://github.com/Stazer/zcene.git", branch = "main" }
+zcene-core = { path = "../../zcene/zcene-core" }

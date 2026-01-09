@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-mod print;
+pub mod print;
 pub(crate) mod test;
 
 #[macro_export]

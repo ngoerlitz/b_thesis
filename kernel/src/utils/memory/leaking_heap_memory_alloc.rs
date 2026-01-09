@@ -2,9 +2,9 @@ use core::alloc::{AllocError, Allocator, GlobalAlloc, Layout};
 use core::ptr::{NonNull, null_mut};
 
 #[derive(Debug, Clone)]
-pub struct LeakingHeapMemoryAllocator;
+pub struct NoOpMemoryAllocator;
 
-unsafe impl GlobalAlloc for LeakingHeapMemoryAllocator {
+unsafe impl GlobalAlloc for NoOpMemoryAllocator {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
         null_mut()
     }
@@ -12,7 +12,7 @@ unsafe impl GlobalAlloc for LeakingHeapMemoryAllocator {
     unsafe fn dealloc(&self, _data: *mut u8, _layout: Layout) {}
 }
 
-unsafe impl Allocator for LeakingHeapMemoryAllocator {
+unsafe impl Allocator for NoOpMemoryAllocator {
     fn allocate(&self, _layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         Err(AllocError)
     }

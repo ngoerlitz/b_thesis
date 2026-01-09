@@ -165,8 +165,8 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
 
     cpu::enable_irq();
 
-    user::test::kernel_func();
-    loop {}
+    // user::test::kernel_func();
+    // loop {}
 
     let _ = RootEnvironment::get().spawn(actor).unwrap();
     RootEnvironment::get().enter();

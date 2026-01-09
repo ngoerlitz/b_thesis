@@ -18,5 +18,5 @@ mod hal;
 pub mod isr;
 mod platform;
 mod services;
-mod user;
+pub mod user;
 pub mod utils;

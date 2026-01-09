@@ -24,6 +24,7 @@ use zcene_core::actor::{
     Actor, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentSpawn,
     ActorFuture, ActorHandleError, ActorMessageSender,
 };
+use zcene_core::future::r#yield;
 
 #[derive(Default)]
 pub struct RootActor {
@@ -56,13 +57,13 @@ impl Actor<RootEnvironment> for RootActor {
                 .unwrap()
         };
 
-        user_addr.send(3);
+        user_addr.send("Hello world, this is my message to you!").await;
+        kprintln!("[ROOT] Sent message to `user_addr` channel");
 
-        let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };
-
-        addr.send(format!("Hello World, this is a message from {}!", self.id).into())
-            .await;
-
+        // let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };
+        //
+        // addr.send(format!("Hello World, this is a message from {}!", self.id).into())
+        //     .await;
         Ok(())
     }
 

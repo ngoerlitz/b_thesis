@@ -16,6 +16,7 @@ use kernel_derive::Constructor;
 use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelReceiver};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use zcene_core::future::r#yield;
+use crate::save_callee_regs;
 
 macro_rules! push_kernel_data {
     () => {
@@ -70,7 +71,7 @@ where
 }
 
 linker_symbols! {
-    USER_END = __user_end;
+    STACK_EL0_TOP = __stack_el0_top;
 }
 
 impl<A, H> UserExecutor<A, H>
@@ -96,22 +97,22 @@ where
 
         kprintln!("USER: AFTER HANDLE");
 
-        // TODO: The receiver here should be a "normal" message CHANNEL - not a USER address. Since
-        // TODO: the user address requires to be in EL0, but all of this code is handled in EL1.
         while let Some(message) = self.receiver.receive().await {
             kprintln!("USER: Received message: {:?}", message);
 
-            self.handle(move |actor, event, stack| {
-                Self::execute_msg(
-                    Box::as_mut_ptr(actor),
-                    message,
-                    event,
-                    stack,
-                    handler::user_message_handler,
-                )
-            })
-            .await;
+            // self.handle(move |actor, event, stack| {
+            //     Self::execute_msg(
+            //         Box::as_mut_ptr(actor),
+            //         message,
+            //         event,
+            //         stack,
+            //         handler::user_message_handler,
+            //     )
+            // })
+            // .await;
         }
+
+        kprintln!("USER: AFTER MESSAGE");
 
         self.handle(|actor, event, stack| {
             Self::execute(
@@ -122,6 +123,8 @@ where
             )
         })
         .await;
+
+        kprintln!("USER: DONE");
     }
 
     async fn handle<F>(&mut self, func: F)
@@ -131,11 +134,12 @@ where
         let mut event: Option<UserExecutorEvent> = None;
 
         // Todo: User stack (this should be from a proper KernelMemoryManager)
-        let stack = USER_END() - 16;
+        let stack = STACK_EL0_TOP();
 
         self.enable_deadline();
 
         // Todo: execute function
+        func(&mut self.actor, &mut event, stack as u64);
 
         loop {
             match event.take() {
@@ -169,28 +173,44 @@ where
         stack: u64,
         function: extern "C" fn(*mut A) -> !,
     ) {
+        #[cfg(feature = "log_debug")]
+        kprintln!("actor: {}, fp: {}, event: {}, sp: {stack}", actor as u64, function as u64, event as *mut _ as u64);
+
         // TODO - THIS NEEDS TO BE CHECKED
         // Missing rust registers (in(reg) actor, ...)
         // Missing restore after label 1:
         // Missing sanity check to see if sp and reg vals are clobbered / restored correctly by llvm
         unsafe {
             asm!(
-                push_kernel_data!(),
-                push_system_regs!(),
-                push_callee_saved_regs!(),
-                // "str {event}, [sp, #-16]!",
-
-                // "msr SP_EL0, {stack}",
-                // "msr ELR_EL1, {function}",
-                // "msr SPSR_EL1, xzr",
-                //
-                // "mov x0, {actor}",
-
+                "msr DAIFSet, #0b1111",
                 "isb",
-                "eret",
 
+                "mov x9, sp",                   // Save the current SP
+
+                save_callee_regs!(),            // Save registers x19-x30 (AAPCS)
+
+                "adr x0, 1f",
+                "stp x0, x9, [sp, #-16]!",      // Save return addr and SP
+
+                "stp x12, xzr, [sp, #-16]!",    // Save xptr and padding (SP ~ 16 Byte)
+
+                "msr SP_EL0, x10",
+                "msr ELR_EL1, x11",
+
+                "msr SPSR_EL1, xzr",
+
+                "mov x0, x13",
+                "isb",
+
+                "eret",
                 "1:",
-                options(noreturn),
+
+                in("x10") stack as u64,
+                in("x11") function as u64,
+                in("x12") event as *mut _ as u64,
+                in("x13") actor as u64,
+
+                options(preserves_flags),
                 clobber_abi("C")
             )
         }
@@ -204,6 +224,8 @@ where
         stack: u64,
         function: extern "C" fn(*mut A, &A::Message) -> !,
     ) {
+        loop {}
+
         // TODO
         unsafe { asm!("wfe", options(noreturn)) }
     }

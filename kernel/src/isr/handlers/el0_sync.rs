@@ -10,6 +10,7 @@ use core::slice;
 
 fn el0_sys_write(ctx: *const ISRContext) {
     unsafe {
+        #[cfg(feature = "log_debug")]
         kprintln!("x0: {:#X} -- x1: {:#X}", (*ctx).x[0], (*ctx).x[1]);
 
         let slice = slice::from_raw_parts((*ctx).x[0] as *const u8, (*ctx).x[1] as usize);
@@ -46,28 +47,10 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
             el0_sys_write(ctx);
         }
         Svc::ReturnEl1 => {
-            //
-            // kprintln!("CTX: {:X} | CTX_EL1: {:X}", ctx as u64, ctx_el1 as u64);
-            //
-            let mut x: *mut i32 = unsafe { (*ctx_el1).xptr as *mut i32 };
-
-            kprintln!("Pointer: {:X} | Value: {}", x as u64, unsafe {
-                x.read_volatile()
-            });
-
-            unsafe {
-                *x += 1;
-            }
-
-            let mut y: u64 = 0;
-            unsafe {
-                asm!(
-                "ldr {}, [{}, #0]" // x2 = x_ptr
-                , out(reg) y, in(reg) ctx_el1, options(nostack, preserves_flags));
-            }
-
+            #[cfg(feature = "log_debug")]
             kprintln!("RETURN_ADDR: 0x{:x}", unsafe { &*ctx_el1 }.ret_addr as u64);
 
+            #[cfg(feature = "log_debug")]
             kprintln!("{:?}", unsafe { &*ctx_el1 });
 
             unsafe {

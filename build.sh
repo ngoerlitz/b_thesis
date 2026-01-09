@@ -1,25 +1,26 @@
 #!/bin/bash
-
 set -euo pipefail
 
 MODE=""
 PROFILE="debug"   # debug|release
 GDB=0
+LOG_DEBUG=0
 EXTRA_QEMU_ARGS=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  build.sh <qemu|rpi> [--release] [--gdb] [-- <extra qemu args>]
+  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [-- <extra qemu args>]
 
 Modes:
   qemu       Build QEMU feature set, create kernel8.img, run QEMU
   rpi        Build hardware feature set, create kernel8.img, copy to /srv/tftp/my.img
 
 Options:
-  --release  Build with cargo --release (otherwise debug)
-  --gdb      (qemu only) Start QEMU with -s -S for gdb attach
-  -h, --help Show this help
+  --release    Build with cargo --release (otherwise debug)
+  --gdb        (qemu only) Start QEMU with -s -S for gdb attach
+  --log-debug  Enable cargo feature flag 'log_debug'
+  -h, --help   Show this help
 
 Notes:
   - Extra arguments after "--" are forwarded to qemu-system-aarch64.
@@ -41,11 +42,13 @@ while [[ $# -gt 0 ]]; do
       PROFILE="release"; shift ;;
     --gdb)
       GDB=1; shift ;;
+    --log-debug)
+      LOG_DEBUG=1; shift ;;
     --help|-h)
       usage; exit 0 ;;
     --)
       shift
-      EXTRA_QEMU_ARGS+=("$@");
+      EXTRA_QEMU_ARGS+=("$@")
       break ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -69,9 +72,15 @@ fi
 artifact_path="target/${TARGET_TRIPLE}/${PROFILE}/${BIN_NAME}"
 
 build_and_objcopy() {
-  local features="$1"
+  local base_feature="$1"
 
   mkdir -p "$OUT_DIR"
+
+  # Compose feature list: base mode feature + optional log_debug
+  local features="$base_feature"
+  if [[ $LOG_DEBUG -eq 1 ]]; then
+    features+=",log_debug"
+  fi
 
   cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features"
 
