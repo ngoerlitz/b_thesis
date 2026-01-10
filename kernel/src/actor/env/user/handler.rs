@@ -9,8 +9,9 @@ use zcene_core::actor::Actor;
 use crate::{svc_call, uprintln};
 use crate::isr::Svc;
 
+#[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    uprintln!("[USER_HANDLER] CREATE HANDLER!!! A: {:X}", actor as u64);
+    uprintln!("[USER_HANDLER] CREATE HANDLER!!! A: {:#X}", actor as u64);
 
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
@@ -26,10 +27,13 @@ pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *
     unreachable!()
 }
 
+#[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
     actor: *mut A,
     msg: &A::Message,
 ) -> ! {
+    uprintln!("[USER_HANDLER] MESSAGE HANDLER!!! A: {:#X}. Message: {:?}", actor as u64, msg);
+
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());
@@ -40,17 +44,13 @@ pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
         Poll::Ready(result) => result,
     };
 
-    unsafe {
-        asm!(
-            // TODO
-            "wfe",
-            options(noreturn)
-        )
-    }
+    svc_call!(Svc::ReturnEl1);
+    unreachable!()
 }
 
+#[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_destroy_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    uprintln!("[USER_HANDLER] DESTROY HANDLER!!! A: {:X}", actor as u64);
+    uprintln!("[USER_HANDLER] DESTROY HANDLER!!! A: {:#X}", actor as u64);
 
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 

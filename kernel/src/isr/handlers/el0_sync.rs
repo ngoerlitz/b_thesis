@@ -2,7 +2,7 @@ use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
 use crate::isr::Svc;
 use crate::isr::context::{EL1Context, ISRContext};
-use crate::kprintln;
+use crate::{kprintln, log_dbg, log_dbg_naked};
 use crate::platform::aarch64::cpu;
 use core::arch::{asm, naked_asm};
 use core::ptr::addr_of;
@@ -10,9 +10,6 @@ use core::slice;
 
 fn el0_sys_write(ctx: *const ISRContext) {
     unsafe {
-        #[cfg(feature = "log_debug")]
-        kprintln!("x0: {:#X} -- x1: {:#X}", (*ctx).x[0], (*ctx).x[1]);
-
         let slice = slice::from_raw_parts((*ctx).x[0] as *const u8, (*ctx).x[1] as usize);
         kprintln!("User: {}", str::from_utf8_unchecked(slice));
     }
@@ -22,6 +19,8 @@ const EC_SVC64: u64 = 0x15;
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Context) {
+    log_dbg!("EL0_SYNC");
+
     // Read ESR_EL1
     let esr: u64;
     unsafe {
@@ -40,18 +39,17 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
 
     let svc_num = (esr & 0xffff) as u16;
 
-    kprintln!("SVC: {}", svc_num);
+    log_dbg_naked!("SVC_NUM: {:#X}", svc_num);
 
     match Svc::from(svc_num) {
         Svc::PrintMsg => {
+            log_dbg_naked!("{:?}", unsafe{&*ctx});
+
             el0_sys_write(ctx);
         }
         Svc::ReturnEl1 => {
-            #[cfg(feature = "log_debug")]
-            kprintln!("RETURN_ADDR: 0x{:x}", unsafe { &*ctx_el1 }.ret_addr as u64);
-
-            #[cfg(feature = "log_debug")]
-            kprintln!("{:?}", unsafe { &*ctx_el1 });
+            log_dbg_naked!("RETURN_ADDR: {:#X}", unsafe {&*ctx_el1}.ret_addr as u64);
+            log_dbg_naked!("{:?}", unsafe {&*ctx_el1});
 
             unsafe {
                 asm!(
@@ -97,8 +95,7 @@ const OFF_X19: usize = 0x08;
 const OFF_LR: usize = 0x60;
 const OFF_RESUME_PC: usize = 0x68;
 
-#[unsafe(no_mangle)]
-extern "C" fn el0_handler() {
+fn el0_handler() {
     let mut uart = unsafe { PL011::new(0xFE201000) };
 
     let _ = uart.enable();

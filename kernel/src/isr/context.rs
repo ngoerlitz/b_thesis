@@ -41,7 +41,7 @@ pub struct EL1Context {
 
 impl core::fmt::Debug for ISRContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExceptionFrame");
+        let mut ds = f.debug_struct("ISRContext");
 
         for i in 0..30 {
             let name = match i {
@@ -96,13 +96,11 @@ impl core::fmt::Debug for EL1Context {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("EL1Context");
 
-        // Metadata / frame header (lowest addresses first, as laid out)
         ds.field("event", &format_args!("{:#018x}", self.event as u64));
         ds.field("pad0", &format_args!("{:#018x}", self.pad0));
         ds.field("ret_addr", &format_args!("{:#018x}", self.ret_addr));
         ds.field("saved_sp", &format_args!("{:#018x}", self.saved_sp));
 
-        // Callee-saved regs (print in architectural order)
         ds.field("x19", &format_args!("{:#018x}", self.x19));
         ds.field("x20", &format_args!("{:#018x}", self.x20));
         ds.field("x21", &format_args!("{:#018x}", self.x21));

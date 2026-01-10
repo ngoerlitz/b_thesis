@@ -17,13 +17,10 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::alloc::Allocator;
 use core::fmt::Debug;
+use core::iter::Map;
 use core::marker::PhantomData;
 use spin::RwLock;
-use zcene_core::actor::{
-    Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference,
-    ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress,
-    ActorSpawnError,
-};
+use zcene_core::actor::{Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference, ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress, ActorMessageChannelSender, ActorSpawnError};
 use zcene_core::future::runtime::{FutureRuntimeHandler, FutureRuntimeReference};
 
 pub struct RootEnvironment<H = RuntimeHandler>
@@ -71,7 +68,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
                 Box::new(actor),
                 receiver,
                 None,
-                PhantomData::default(),
+                PhantomData,
             )
             .run()
             .await

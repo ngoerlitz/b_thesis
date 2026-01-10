@@ -14,7 +14,7 @@ use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::hal::serial::SerialDriver;
 use crate::hal::timer::SystemTimerDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::{bsp, drivers, kprintln, user};
+use crate::{bsp, drivers, kprintln, log_dbg, user};
 use alloc::sync::Arc;
 use core::arch::asm;
 use core::fmt::{Debug, Formatter};
@@ -165,57 +165,8 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
 
     cpu::enable_irq();
 
-    // user::test::kernel_func();
-    // loop {}
-
     let _ = RootEnvironment::get().spawn(actor).unwrap();
     RootEnvironment::get().enter();
-
-    loop {}
-
-    /*
-        unsafe {
-            let (arg0, sp) = write_cpu_boot_info(
-                1,
-                CpuBootInformation {
-                    uart: shared_device.clone(),
-                    rand_value: 25,
-                },
-            );
-            write_mailbox_for_core(1, sp, arg0);
-
-            let (arg0, sp) = write_cpu_boot_info(
-                2,
-                CpuBootInformation {
-                    uart: shared_device.clone(),
-                    rand_value: 77,
-                },
-            );
-            write_mailbox_for_core(2, sp, arg0);
-
-            let (arg0, sp) = write_cpu_boot_info(
-                3,
-                CpuBootInformation {
-                    uart: shared_device.clone(),
-                    rand_value: 923,
-                },
-            );
-            write_mailbox_for_core(3, sp, arg0);
-        }
-
-        loop {
-            {
-                let mut lock = shared_device.lock();
-                writeln!(lock, "Mailbox Addr: {:x}", MAILBOX_TOP());
-            }
-
-            for _ in 0..5_000_000 {
-                unsafe {
-                    asm!("nop");
-                }
-            }
-        }
-    */
 
     loop {}
 }
@@ -228,3 +179,48 @@ fn get_core_stack(core_id: u8) -> usize {
         _ => unimplemented!(),
     }
 }
+
+
+/*
+    unsafe {
+        let (arg0, sp) = write_cpu_boot_info(
+            1,
+            CpuBootInformation {
+                uart: shared_device.clone(),
+                rand_value: 25,
+            },
+        );
+        write_mailbox_for_core(1, sp, arg0);
+
+        let (arg0, sp) = write_cpu_boot_info(
+            2,
+            CpuBootInformation {
+                uart: shared_device.clone(),
+                rand_value: 77,
+            },
+        );
+        write_mailbox_for_core(2, sp, arg0);
+
+        let (arg0, sp) = write_cpu_boot_info(
+            3,
+            CpuBootInformation {
+                uart: shared_device.clone(),
+                rand_value: 923,
+            },
+        );
+        write_mailbox_for_core(3, sp, arg0);
+    }
+
+    loop {
+        {
+            let mut lock = shared_device.lock();
+            writeln!(lock, "Mailbox Addr: {:x}", MAILBOX_TOP());
+        }
+
+        for _ in 0..5_000_000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
+    }
+*/

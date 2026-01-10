@@ -1,7 +1,12 @@
+use alloc::boxed::Box;
 use crate::actor::env::user::address::UserAddress;
 use crate::actor::env::user::ctx::UserEnvironmentHandleCtx;
 use core::fmt::Debug;
-use zcene_core::actor::{Actor, ActorEnvironment, ActorMessage};
+use core::marker::PhantomData;
+use zcene_core::actor::{Actor, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference, ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorSpawnError};
+use zcene_core::future::runtime::FutureRuntimeHandler;
+use crate::actor::env::root::environment::RootEnvironment;
+use crate::actor::env::user::executor::UserExecutor;
 
 pub struct UserEnvironment;
 
@@ -11,3 +16,11 @@ impl ActorEnvironment for UserEnvironment {
     type HandleContext<'a, M: ActorMessage> = UserEnvironmentHandleCtx<M>;
     type DestroyContext<'a> = ();
 }
+
+// impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for UserEnvironment {
+//     fn spawn(self: &ActorEnvironmentReference<Self>, actor: A) -> Result<Self::Address<A>, ActorSpawnError> {
+//         // TODO
+//
+//         Err(ActorSpawnError::Unknown)
+//     }
+// }

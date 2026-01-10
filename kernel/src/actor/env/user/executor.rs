@@ -98,18 +98,18 @@ where
         kprintln!("USER: AFTER HANDLE");
 
         while let Some(message) = self.receiver.receive().await {
-            kprintln!("USER: Received message: {:?}", message);
+            kprintln!("USER: Received message: {:?}", &message);
 
-            // self.handle(move |actor, event, stack| {
-            //     Self::execute_msg(
-            //         Box::as_mut_ptr(actor),
-            //         message,
-            //         event,
-            //         stack,
-            //         handler::user_message_handler,
-            //     )
-            // })
-            // .await;
+            self.handle(move |actor, event, stack| {
+                Self::execute_msg(
+                    Box::as_mut_ptr(actor),
+                    message,
+                    event,
+                    stack,
+                    handler::user_message_handler,
+                )
+            })
+            .await;
         }
 
         kprintln!("USER: AFTER MESSAGE");
@@ -224,10 +224,42 @@ where
         stack: u64,
         function: extern "C" fn(*mut A, &A::Message) -> !,
     ) {
-        loop {}
+        unsafe {
+            asm!(
+                "msr DAIFSet, #0b1111",
+                "isb",
 
-        // TODO
-        unsafe { asm!("wfe", options(noreturn)) }
+                "mov x9, sp",                   // Save the current SP
+
+                save_callee_regs!(),            // Save registers x19-x30 (AAPCS)
+
+                "adr x0, 1f",
+                "stp x0, x9, [sp, #-16]!",      // Save return addr and SP
+
+                "stp x12, xzr, [sp, #-16]!",    // Save xptr and padding (SP ~ 16 Byte)
+
+                "msr SP_EL0, x10",
+                "msr ELR_EL1, x11",
+
+                "msr SPSR_EL1, xzr",
+
+                "mov x0, x13",
+                "mov x1, x14",
+                "isb",
+
+                "eret",
+                "1:",
+
+                in("x10") stack as u64,
+                in("x11") function as u64,
+                in("x12") event as *mut _ as u64,
+                in("x13") actor as u64,
+                in("x14") &message as *const _ as u64,
+
+                options(preserves_flags),
+                clobber_abi("C")
+            )
+        }
     }
 }
 
