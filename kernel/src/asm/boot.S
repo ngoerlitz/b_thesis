@@ -11,11 +11,7 @@
 .extern _el3
 
 _start:
-    bl _park_secondary
     b _el3
-1:
-    wfe
-    b 1b
 
 _setup:
 	// Initialize DRAM.
@@ -31,8 +27,8 @@ _setup:
 	// Prepare the jump to Rust code.
 .L_prepare_rust:
 	// Set the stack pointer.
-    adrp x2, __stack_00_el1_top
-    add x2, x2, #:lo12:__stack_00_el1_top
+    adrp x2, __stack_el1_top
+    add x2, x2, #:lo12:__stack_el1_top
     mov sp, x2
 
     msr daifset, #0xF

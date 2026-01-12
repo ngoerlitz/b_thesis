@@ -4,10 +4,7 @@ __rpi_phys_dram_start_addr = 0;
 __rpi_phys_binary_load_addr = 0x80000;
 
 /* ---- constants ---- */
-STACK_SIZE   = 16K;
-NUM_KSTACKS  = 4;
 HEAP_SIZE    = 1024M;
-PAGE_SIZE    = 4K;
 
 NUM_USTACKS = 1;
 USTACK_SIZE = 16K;
@@ -15,7 +12,8 @@ USTACK_SIZE = 16K;
 ENTRY(_start)
 
 /* Program headers for ELF loaders (e.g. QEMU -kernel with ELF) */
-__stack_00_el1_top = (0x10000);
+__stack_el1_top = (0x80000 - 0x10);
+__stack_el1_size = 16K;
 
 SECTIONS
 {

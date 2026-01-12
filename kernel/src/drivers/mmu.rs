@@ -203,7 +203,7 @@ pub unsafe fn init_page_tables() {
                 ATTR_INDEX_NORMAL,
                 SH_INNER_SHAREABLE,
                 AP_EL1_RW_EL0_RW,
-                false,
+                true,
                 true,
             ) // EL1 X ok, EL0 XN
         } else {

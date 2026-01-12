@@ -4,14 +4,14 @@ compile_error!("Features `qemu` and `hardware` are exclusive");
 #[cfg(not(any(feature = "qemu", feature = "hardware")))]
 compile_error!("One feature required [none selected]: `qemu` or `hardware`");
 
-mod rpi4b;
-mod rpi4b_qemu;
+pub mod rpi4b;
+pub mod rpi4b_qemu;
 
 #[cfg(feature = "hardware")]
-use rpi4b as imp;
+pub use rpi4b as imp;
 
 #[cfg(feature = "qemu")]
-use rpi4b_qemu as imp;
+pub use rpi4b_qemu as imp;
 
 pub use imp::secondary_boot;
 

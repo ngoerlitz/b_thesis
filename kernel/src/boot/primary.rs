@@ -14,7 +14,7 @@ use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::hal::serial::SerialDriver;
 use crate::hal::timer::SystemTimerDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::{bsp, drivers, kprintln, log_dbg, user};
+use crate::{bsp, drivers, kprintln, linker_symbols, log_dbg, user};
 use alloc::sync::Arc;
 use core::arch::asm;
 use core::fmt::{Debug, Formatter};
@@ -97,6 +97,14 @@ fn write_cpu_boot_info(core_id: u8, info: CpuBootInformation) -> (u64, u64) {
 pub static UART0: spin::mutex::Mutex<PL011> =
     spin::mutex::Mutex::new(unsafe { PL011::new(bsp::constants::UART0_BASE) });
 
+linker_symbols! {
+    EL1_STACK_TOP = __stack_el1_top;
+}
+
+unsafe extern "C" {
+    fn _secondary_release();
+}
+
 pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
     unsafe {
         drivers::mmu::init_page_tables();
@@ -119,7 +127,19 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
             .write(x.into());
     }
 
-    kprintln!("[INFO] Kernel Initializing");
+    // Bring up the other cores
+    unsafe {
+        // 0xD8
+        // 0xE0
+        // 0xE8
+        // 0xF0
+        ((0xD8) as *mut u64).write_volatile(_secondary_release as usize as u64);
+        ((0xE0) as *mut u64).write_volatile(_secondary_release as usize as u64);
+        ((0xE8) as *mut u64).write_volatile(_secondary_release as usize as u64);
+        ((0xF0) as *mut u64).write_volatile(_secondary_release as usize as u64);
+    }
+
+    kprintln!("[INFO] Kernel Initializing. EL1-STACK: {:#X}", EL1_STACK_TOP());
 
     {
         let mut irq = RootEnvironment::get().irq_manager().write();
