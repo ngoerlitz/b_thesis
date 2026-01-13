@@ -16,6 +16,7 @@ cfg-if = { version = "1.0.4" }
 
 [features]
 log_debug = []
+log_cores = []
 hardware = []
 qemu = []
 

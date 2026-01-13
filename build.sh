@@ -10,7 +10,7 @@ EXTRA_QEMU_ARGS=()
 usage() {
   cat <<'USAGE'
 Usage:
-  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [-- <extra qemu args>]
+  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [--log-cores] [-- <extra qemu args>]
 
 Modes:
   qemu       Build QEMU feature set, create kernel8.img, run QEMU
@@ -20,6 +20,7 @@ Options:
   --release    Build with cargo --release (otherwise debug)
   --gdb        (qemu only) Start QEMU with -s -S for gdb attach
   --log-debug  Enable cargo feature flag 'log_debug'
+  --log-cores  Enable cargo feature flag 'log_cores'
   -h, --help   Show this help
 
 Notes:
@@ -44,6 +45,8 @@ while [[ $# -gt 0 ]]; do
       GDB=1; shift ;;
     --log-debug)
       LOG_DEBUG=1; shift ;;
+    --log-cores)
+      LOG_CORES=1; shift ;;
     --help|-h)
       usage; exit 0 ;;
     --)
@@ -80,6 +83,10 @@ build_and_objcopy() {
   local features="$base_feature"
   if [[ $LOG_DEBUG -eq 1 ]]; then
     features+=",log_debug"
+  fi
+
+  if [[ $LOG_CORES -eq 1 ]]; then
+    features+=",log_cores"
   fi
 
   cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features"

@@ -1,3 +1,4 @@
+use core::fmt;
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::platform::aarch64::cpu;
 
@@ -17,5 +18,12 @@ macro_rules! kprintln {
 
 pub fn kprint(args: core::fmt::Arguments) {
     let mut logger = RootEnvironment::get().logger().writer();
+
+    #[cfg(feature = "log_cores")]
+    let cpuid = cpu::cpuid();
+
+    #[cfg(feature = "log_cores")]
+    let _ = core::fmt::write(&mut logger, format_args!("[CORE: {}]", cpuid));
+
     let _ = core::fmt::write(&mut logger, args);
 }

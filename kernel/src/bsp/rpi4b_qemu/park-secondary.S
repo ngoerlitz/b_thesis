@@ -29,9 +29,6 @@ _park_secondary:
     */
 
 _secondary_release:
-    mrs x0, mpidr_el1
-    and x0, x0, #0x3            // CoreID
-
     // Load stack for core (this is __KSTACK_BASE - (__KSTACK_SIZE * CoreID))
     adrp x1, __stack_el1_top
     add x1, x1, :lo12:__stack_el1_top

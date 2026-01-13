@@ -16,6 +16,7 @@ use kernel_derive::Constructor;
 use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelReceiver};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use zcene_core::future::r#yield;
+use crate::platform::aarch64::cpu::cpuid;
 use crate::save_callee_regs;
 
 macro_rules! push_kernel_data {
@@ -134,7 +135,8 @@ where
         let mut event: Option<UserExecutorEvent> = None;
 
         // Todo: User stack (this should be from a proper KernelMemoryManager)
-        let stack = STACK_EL0_TOP();
+        let cpuid = cpuid() as usize;
+        let stack = STACK_EL0_TOP() - (cpuid * 0x4000);
 
         self.enable_deadline();
 

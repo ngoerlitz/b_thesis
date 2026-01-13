@@ -57,10 +57,20 @@ impl Actor<RootEnvironment> for RootActor {
                 .unwrap()
         };
 
+        let user_addr2 = unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserActor::default())
+                .unwrap()
+        };
+
         user_addr.send("Hello world, this is my message to you!").await;
+        user_addr2.send("Hello world, this is my message to you!").await;
         user_addr.send("Hello world, is my message to you!").await;
+        user_addr2.send("Hello world, is my message to you!").await;
         user_addr.send("Hello world, this is my to you!").await;
+        user_addr2.send("Hello world, this is my to you!").await;
         user_addr.send(" world, this is my message to you!").await;
+        user_addr2.send(" world, this is my message to you!").await;
         kprintln!("[ROOT] Sent message to `user_addr` channel");
 
         let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };

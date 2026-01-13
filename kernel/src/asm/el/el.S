@@ -13,5 +13,18 @@
 
 .globl _el1
 
+.extern _setup
+.extern _secondary_release
+
 _el1:
+    mrs x0, mpidr_el1
+    and x0, x0, #0xFF
+
+    cbnz x0, 1f
+
     b _setup
+
+1:
+    adrp x1, _secondary_release
+    add x1, x1, :lo12:_secondary_release
+    br x1

@@ -6,7 +6,7 @@ __rpi_phys_binary_load_addr = 0x80000;
 /* ---- constants ---- */
 HEAP_SIZE    = 1024M;
 
-NUM_USTACKS = 1;
+NUM_USTACKS = 4;
 USTACK_SIZE = 16K;
 
 ENTRY(_start)

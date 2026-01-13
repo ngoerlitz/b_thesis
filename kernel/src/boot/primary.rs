@@ -17,7 +17,7 @@ use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::{bsp, drivers, kprintln, linker_symbols, log_dbg, user};
 use alloc::sync::Arc;
 use core::arch::asm;
-use core::fmt::{Debug, Formatter};
+use core::fmt::{Debug, Display, Formatter};
 use core::time::Duration;
 use core::{fmt, ptr};
 use spin::Mutex;
@@ -102,7 +102,7 @@ linker_symbols! {
 }
 
 unsafe extern "C" {
-    fn _secondary_release();
+    fn _el3();
 }
 
 pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
@@ -133,10 +133,9 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
         // 0xE0
         // 0xE8
         // 0xF0
-        ((0xD8) as *mut u64).write_volatile(_secondary_release as usize as u64);
-        ((0xE0) as *mut u64).write_volatile(_secondary_release as usize as u64);
-        ((0xE8) as *mut u64).write_volatile(_secondary_release as usize as u64);
-        ((0xF0) as *mut u64).write_volatile(_secondary_release as usize as u64);
+        ((0xE0) as *mut u64).write_volatile(_el3 as usize as u64);
+        ((0xE8) as *mut u64).write_volatile(_el3 as usize as u64);
+        ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
     }
 
     kprintln!("[INFO] Kernel Initializing. EL1-STACK: {:#X}", EL1_STACK_TOP());
@@ -184,6 +183,10 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
     }
 
     cpu::enable_irq();
+
+    for _ in 0..500_000 {
+        unsafe { asm!("nop") }
+    }
 
     let _ = RootEnvironment::get().spawn(actor).unwrap();
     RootEnvironment::get().enter();
