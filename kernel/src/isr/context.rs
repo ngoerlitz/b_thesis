@@ -1,6 +1,7 @@
 use crate::actor::env::user::executor_event::UserExecutorEvent;
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct ISRContext {
     pub x: [u64; 30],
 

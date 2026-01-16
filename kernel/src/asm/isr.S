@@ -94,6 +94,43 @@
 
 .endm
 
+// Callee saved registers [x19-x28]
+_el0_syscall_entry:
+    msr DAIFSet, #0b1111    // Disable interrupts
+
+    // Move args
+    mov x15, x0
+    mov x16, x1
+
+    // SP at stack entry -> should equal a pointer to the EL1Context
+    mov x3, sp
+
+    sub sp, sp, #16
+    stp x30, x29, [sp, #0]  // [SP + 0 ]
+
+    sub sp, sp, #16
+    mrs x0, ELR_EL1
+    mrs x1, SPSR_EL1
+    stp x0, x1, [sp, #0]    // [SP + 0 ] [SP + 8 ]
+
+    // x19 - x28 => 10 Regs * 8 Bytes = 80 Bytes
+    sub sp, sp, #80
+    stp x27, x28, [sp, #64] // [SP + 64] [SP + 72]
+    stp x25, x26, [sp, #48] // [SP + 48] [SP + 56]
+    stp x23, x24, [sp, #32] // [SP + 32] [SP + 40]
+    stp x21, x22, [sp, #16] // [SP + 16] [SP + 24]
+    stp x19, x20, [sp, #0]  // [SP + 0 ] [SP + 8 ]
+
+    mov x0, x15
+    mov x1, x16
+    mov x2, sp
+    mov x3, x3
+    bl el0_sync
+1:
+    // Unreachable.
+    b 1b
+
+
 .section .text
 .align 11
 .global el1_vectors
@@ -121,7 +158,8 @@ el1_vectors:
 //------------------------------------------------------------------------------
 // From Lower EL (AArch64)
 //------------------------------------------------------------------------------
-    VECTOR_SYNC el0_sync           // VBAR_EL1 + 0x400  EL0: Synchronous
+    .balign 0x80                   // VBAR_EL1 + 0x400  EL0: Synchronous
+    b _el0_syscall_entry
     VECTOR el0_irq                 // VBAR_EL1 + 0x480  EL0: IRQ
     VECTOR unhandled_irq           // VBAR_EL1 + 0x500  EL0: FIQ
     VECTOR unhandled_irq           // VBAR_EL1 + 0x580  EL0: SError

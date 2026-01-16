@@ -5,4 +5,4 @@ pub mod executor;
 pub mod executor_event;
 mod executor_result;
 mod handler;
-mod message_handler;
+pub mod message_handler;

@@ -13,6 +13,6 @@ macro_rules! uprintln {
 #[macro_export]
 macro_rules! svc_call {
     ($svcid: expr) => {
-        unsafe { asm!("svc #{imm}", imm = const($svcid as u16), options(nostack)) }
+        unsafe { asm!("svc #{imm}", imm = const($svcid as u16), clobber_abi("C")) }
     };
 }

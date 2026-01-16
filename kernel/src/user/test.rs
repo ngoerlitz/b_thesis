@@ -1,6 +1,6 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::timer::SystemTimerDriver;
-use crate::isr::Svc;
+use crate::isr::SvcType;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::{kprintln, save_callee_regs, svc_call, uprintln};
 use alloc::format;
@@ -130,5 +130,5 @@ pub extern "C" fn user_func(cpu_id: u8, x: *const i32) {
         unsafe { asm!("nop") }
     }
 
-    svc_call!(Svc::ReturnEl1);
+    svc_call!(SvcType::ReturnEl1);
 }

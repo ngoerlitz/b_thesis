@@ -173,6 +173,7 @@ name = "kernel-playground"
 version = "0.1.0"
 dependencies = [
  "kernel",
+ "kernel-derive",
  "zcene-core",
 ]
 

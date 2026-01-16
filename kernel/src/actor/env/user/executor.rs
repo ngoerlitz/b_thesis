@@ -1,21 +1,26 @@
+use alloc::alloc::Global;
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::actor::env::user::environment::UserEnvironment;
-use crate::actor::env::user::executor_event::UserExecutorEvent;
+use crate::actor::env::user::executor_event::{SystemCallExecutorType, UserExecutorEvent};
 use crate::actor::env::user::handler;
 use crate::actor::env::user::message_handler::UserMessageHandler;
 use crate::platform::aarch64::get_cpu_timer;
-use crate::{kprintln, linker_symbols};
+use crate::{kprintln, linker_symbols, log_dbg};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::arch::{asm, naked_asm};
 use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
 use core::num::NonZero;
+use core::{slice};
+use core::iter::Map;
 use core::time::Duration;
 use kernel_derive::Constructor;
-use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelReceiver};
+use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelAddress, ActorMessageChannelReceiver, ActorMessageChannelSender};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use zcene_core::future::r#yield;
+use crate::isr::context::ISRContext;
+use crate::isr::SvcType;
 use crate::platform::aarch64::cpu::cpuid;
 use crate::save_callee_regs;
 
@@ -61,13 +66,13 @@ where
     actor: Box<A>,
     receiver: ActorMessageChannelReceiver<A::Message>,
     deadline_in_ms: Option<NonZero<usize>>,
-    // message_handlers: Vec<
-    //     Box<
-    //         dyn UserMessageHandler<RootEnvironment<H>>,
-    //         <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
-    //     >,
-    //     <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
-    // >,
+    message_handlers: Vec<
+        Box<
+            dyn UserMessageHandler<UserEnvironment>,
+            <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
+        >,
+        <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
+    >,
     marker_h: PhantomData<H>,
 }
 
@@ -146,7 +151,37 @@ where
         loop {
             match event.take() {
                 None => break,
-                Some(UserExecutorEvent::SystemCall()) => {}
+                Some(UserExecutorEvent::SystemCall(ctx)) => {
+                    kprintln!("{:?}", ctx);
+
+                    match ctx.svc_num {
+                         SvcType::PrintMsg => {
+                            unsafe {
+                                let slice = slice::from_raw_parts(ctx.args[0] as *const u8, ctx.args[1] as usize);
+                                kprintln!("User: {}", str::from_utf8_unchecked(slice));
+
+                                Self::continue_from_syscall(&mut event, &ctx);
+                            }
+                        },
+                        SvcType::Test => {
+                            Self::continue_from_syscall(&mut event, &ctx);
+                        },
+                        SvcType::SendMsg => {
+                            match self.message_handlers.get(ctx.args[0] as usize) {
+                                Some(handler) => {
+                                    let _result = handler.send(&Global, ctx.args[1] as *const ()).await;
+                                },
+                                None => todo!()
+                            }
+
+                            Self::continue_from_syscall(&mut event, &ctx);
+                        },
+                        SvcType::ReturnEl1 => {
+                            break;
+                        }
+                        _ => unimplemented!()
+                    }
+                }
                 Some(UserExecutorEvent::Preemption()) => {
                     r#yield().await;
 
@@ -155,6 +190,46 @@ where
                     todo!("Continue from deadline preemption")
                 }
             }
+        }
+    }
+
+    #[inline(never)]
+    extern "C" fn continue_from_syscall(
+        event: &mut Option<UserExecutorEvent>,
+        ctx: &SystemCallExecutorType,
+    ) {
+        unsafe {
+            asm!(
+                r#"
+                    mov x1, sp
+                "#,
+                    save_callee_regs!(),
+                r#"
+                    adr x0, 1f
+                    stp x0, x1, [sp, #-16]!
+                    stp x12, xzr, [sp, #-16]!
+
+
+                    ldp x19, x20, [x13, #0]
+                    ldp x21, x22, [x13, #16]
+                    ldp x23, x24, [x13, #32]
+                    ldp x25, x26, [x13, #48]
+                    ldp x27, x28, [x13, #64]
+
+                    ldp x15, x16, [x13, #80]
+                    msr ELR_EL1, x15
+                    msr SPSR_EL1, x16
+
+                    ldp x30, x29, [x13, #96]
+
+                    isb
+                    eret
+                    1:
+                "#,
+                in("x12") (event as *const _ as u64),
+                in("x13") (ctx as *const _ as u64),
+                clobber_abi("C")
+            )
         }
     }
 

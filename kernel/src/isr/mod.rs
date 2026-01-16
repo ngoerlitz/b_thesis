@@ -3,20 +3,24 @@ use core::fmt::Debug;
 pub(crate) mod context;
 pub(crate) mod el;
 pub(crate) mod handlers;
+pub(crate) mod svc_ctx;
 
 #[repr(u16)]
-pub enum Svc {
+#[derive(Debug)]
+pub enum SvcType {
     PrintMsg = 0x2,
     SendMsg = 0x3,
     ReturnEl1 = 0x4,
+    Test = 0x5,
 }
 
-impl From<u16> for Svc {
-    fn from(val: u16) -> Svc {
+impl From<u16> for SvcType {
+    fn from(val: u16) -> SvcType {
         match val {
-            0x2 => Svc::PrintMsg,
-            0x3 => Svc::SendMsg,
-            0x4 => Svc::ReturnEl1,
+            0x2 => SvcType::PrintMsg,
+            0x3 => SvcType::SendMsg,
+            0x4 => SvcType::ReturnEl1,
+            0x5 => SvcType::Test,
             _ => unimplemented!(),
         }
     }

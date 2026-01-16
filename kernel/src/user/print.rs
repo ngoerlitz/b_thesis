@@ -1,4 +1,4 @@
-use crate::isr::Svc;
+use crate::isr::SvcType;
 use core::arch::asm;
 use core::fmt;
 
@@ -52,10 +52,11 @@ fn sys_write(buf: *const u8, len: usize) {
     unsafe {
         asm!(
         "svc #{svc}",
-        svc = const Svc::PrintMsg as u16,
+        svc = const SvcType::PrintMsg as u16,
         in("x0") buf,
         in("x1") len,
-        options(nostack, preserves_flags)
+        options(nostack, preserves_flags),
+        clobber_abi("C")
         );
     }
 }

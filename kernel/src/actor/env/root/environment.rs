@@ -2,7 +2,7 @@ use crate::actor::env::root::ctx::{
     RootEnvironmentCreateCtx, RootEnvironmentDestroyCtx, RootEnvironmentHandleCtx,
 };
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
-use crate::actor::env::user::address::UserAddress;
+use crate::actor::env::user::address::UserViewAddress;
 use crate::actor::env::user::environment::UserEnvironment;
 use crate::actor::env::user::executor::UserExecutor;
 use crate::actor::runtime::handler::RuntimeHandler;
@@ -15,6 +15,7 @@ use crate::services::irq_manager::IrqManagerService;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::fmt::Debug;
 use core::iter::Map;
@@ -22,6 +23,7 @@ use core::marker::PhantomData;
 use spin::RwLock;
 use zcene_core::actor::{Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference, ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress, ActorMessageChannelSender, ActorSpawnError};
 use zcene_core::future::runtime::{FutureRuntimeHandler, FutureRuntimeReference};
+use crate::actor::env::user::message_handler::UserMessageHandler;
 
 pub struct RootEnvironment<H = RuntimeHandler>
 where
@@ -57,6 +59,13 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
     pub fn spawn_user<A: Actor<UserEnvironment>>(
         self: &ActorEnvironmentReference<Self>,
         mut actor: A,
+        message_handlers: Vec<
+            Box<
+                dyn UserMessageHandler<UserEnvironment>,
+                <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
+            >,
+            <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
+        >,
     ) -> Result<ActorMessageChannelAddress<A, UserEnvironment>, ActorSpawnError>
     {
         let (sender, receiver) = ActorMessageChannel::<A::Message>::new_unbounded();
@@ -68,6 +77,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
                 Box::new(actor),
                 receiver,
                 None,
+                message_handlers,
                 PhantomData,
             )
             .run()
@@ -76,7 +86,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
 
         Ok(
             ActorMessageChannelAddress::new(
-                sender
+                sender,
             )
         )
     }

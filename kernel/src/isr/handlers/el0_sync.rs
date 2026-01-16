@@ -1,25 +1,19 @@
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
-use crate::isr::Svc;
+use crate::isr::SvcType;
 use crate::isr::context::{EL1Context, ISRContext};
 use crate::{kprintln, log_dbg, log_dbg_naked};
 use crate::platform::aarch64::cpu;
 use core::arch::{asm, naked_asm};
 use core::ptr::addr_of;
 use core::slice;
-
-fn el0_sys_write(ctx: *const ISRContext) {
-    unsafe {
-        let slice = slice::from_raw_parts((*ctx).x[0] as *const u8, (*ctx).x[1] as usize);
-        kprintln!("User: {}", str::from_utf8_unchecked(slice));
-    }
-}
+use crate::actor::env::user::executor_event::{SystemCallExecutorType, UserExecutorEvent};
+use crate::isr::svc_ctx::SyscallContext;
 
 const EC_SVC64: u64 = 0x15;
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Context) {
-    log_dbg!("EL0_SYNC");
+pub unsafe extern "C" fn el0_sync(arg0: u64, arg1: u64, ctx: *const SyscallContext, ctx_el1: *mut EL1Context) {
 
     // Read ESR_EL1
     let esr: u64;
@@ -31,8 +25,7 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
         );
     }
 
-    let ec = (esr >> 26) & 0x3f;
-
+    let ec = (esr >> 26) & 0x3F;
     if ec != EC_SVC64 {
         el0_handler();
     }
@@ -41,12 +34,91 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
 
     log_dbg_naked!("SVC_NUM: {:#X}", svc_num);
 
+    unsafe {
+        *(*ctx_el1).event = Some(UserExecutorEvent::SystemCall(SystemCallExecutorType {
+            ctx: (*ctx).clone(),
+            args: [arg0, arg1],
+            svc_num: svc_num.into()
+        }));
+    }
+
+    // Return control to the state in EL1Context -> the actor's executor
+    unsafe {
+        asm!(
+            // Restore callee-saved regs from EL1Context
+            "ldp x29, x30, [x1, #32]",
+            "ldp x27, x28, [x1, #48]",
+            "ldp x25, x26, [x1, #64]",
+            "ldp x23, x24, [x1, #80]",
+            "ldp x21, x22, [x1, #96]",
+            "ldp x19, x20, [x1, #112]",
+
+            // Load resume PC and SP
+            "ldr x2, [x1, #16]",   // ret_addr
+            "msr ELR_EL1, x2",
+
+            "ldr x2, [x1, #24]",   // saved_sp
+            "mov sp, x2",
+
+            // Return to EL1h (pick DAIF mask as you want; this matches your earlier constant)
+            "mov x2, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",
+            "msr SPSR_EL1, x2",
+
+            "isb",
+            "eret",
+
+            in("x1") (ctx_el1 as u64),
+
+            options(noreturn),
+        );
+    }
+
+    /*
     match Svc::from(svc_num) {
         Svc::PrintMsg => {
-            log_dbg_naked!("{:?}", unsafe{&*ctx});
-
-            el0_sys_write(ctx);
+            let slice = slice::from_raw_parts(arg0 as *const u8, arg1 as usize);
+            kprintln!("User: {}", str::from_utf8_unchecked(slice));
         }
+        Svc::Test => {
+            unsafe {
+                *(*ctx_el1).event = Some(UserExecutorEvent::SystemCall(SystemCallExecutorType {
+                    ctx: (*ctx).clone(),
+                    args: [arg0, arg1],
+                    svc_num
+                }));
+            }
+
+            // Return control to the state in EL1Context -> the actor's executor
+            unsafe {
+                asm!(
+                // Restore callee-saved regs from EL1Context
+                "ldp x29, x30, [x1, #32]",
+                "ldp x27, x28, [x1, #48]",
+                "ldp x25, x26, [x1, #64]",
+                "ldp x23, x24, [x1, #80]",
+                "ldp x21, x22, [x1, #96]",
+                "ldp x19, x20, [x1, #112]",
+
+                // Load resume PC and SP
+                "ldr x2, [x1, #16]",   // ret_addr
+                "msr ELR_EL1, x2",
+
+                "ldr x2, [x1, #24]",   // saved_sp
+                "mov sp, x2",
+
+                // Return to EL1h (pick DAIF mask as you want; this matches your earlier constant)
+                "mov x2, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",
+                "msr SPSR_EL1, x2",
+
+                "isb",
+                "eret",
+
+                in("x1") (ctx_el1 as u64),
+
+                options(noreturn),
+                );
+            }
+        },
         Svc::ReturnEl1 => {
             log_dbg_naked!("RETURN_ADDR: {:#X}", unsafe {&*ctx_el1}.ret_addr as u64);
             log_dbg_naked!("{:?}", unsafe {&*ctx_el1});
@@ -88,6 +160,7 @@ pub unsafe extern "C" fn el0_sync(ctx: *const ISRContext, ctx_el1: *const EL1Con
             el0_handler();
         }
     }
+    */
 }
 
 const OFF_SAVED_SP: usize = 0x00;

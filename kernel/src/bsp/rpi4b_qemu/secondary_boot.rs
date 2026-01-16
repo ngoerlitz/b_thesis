@@ -7,22 +7,24 @@ use crate::kprintln;
 
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn _secbt(cpuid: u8) {
-    kprintln!("BOOTED CORE: {}", cpuid);
+    // kprintln!("BOOTED CORE: {}", cpuid);
+    //
+    // RootEnvironment::get().enter();
+    //
+    // kprintln!("Exited the root environment");
+    //
+    // loop {}
+    //
 
-    RootEnvironment::get().enter();
-
-    kprintln!("Exited the root environment");
+    // let mut uart = PL011::default();
+    //
+    // loop {
+    //     write!(uart, "Hello, I am on a different core! [{}]\n", cpuid);
+    //
+    //     for _ in 0..100_000 {
+    //         unsafe { asm!("nop"); }
+    //     }
+    // }
 
     loop {}
-
-
-    let mut uart = PL011::default();
-
-    loop {
-        write!(uart, "Hello, I am on a different core! [{}]\n", cpuid);
-
-        for _ in 0..100_000 {
-            unsafe { asm!("nop"); }
-        }
-    }
 }

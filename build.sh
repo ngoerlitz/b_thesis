@@ -5,6 +5,7 @@ MODE=""
 PROFILE="debug"   # debug|release
 GDB=0
 LOG_DEBUG=0
+LOG_CORES=0
 EXTRA_QEMU_ARGS=()
 
 usage() {
