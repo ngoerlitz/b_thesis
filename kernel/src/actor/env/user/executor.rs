@@ -102,21 +102,30 @@ where
         .await;
 
         kprintln!("USER: AFTER HANDLE");
-
         while let Some(message) = self.receiver.receive().await {
-            kprintln!("USER: Received message: {:?}", &message);
+            // &'static str
+            kprintln!("USER: Received message: {:?} | Size: {}", &message, size_of::<A::Message>());
+
+            // Todo, reserve some space to page aligned memory to store the message.
+            let b = Box::new(message);
+            let ptr: u64 = Box::into_raw(b) as *const _ as u64;
 
             self.handle(move |actor, event, stack| {
                 Self::execute_msg(
                     Box::as_mut_ptr(actor),
-                    message,
+                    ptr as *const A::Message,
                     event,
                     stack,
                     handler::user_message_handler,
                 )
             })
-            .await;
+                .await;
+
+            unsafe {
+                let _ = Box::from_raw(ptr as *mut A::Message);
+            }
         }
+
 
         kprintln!("USER: AFTER MESSAGE");
 
@@ -145,7 +154,6 @@ where
 
         self.enable_deadline();
 
-        // Todo: execute function
         func(&mut self.actor, &mut event, stack as u64);
 
         loop {
@@ -215,12 +223,11 @@ where
                     ldp x23, x24, [x13, #32]
                     ldp x25, x26, [x13, #48]
                     ldp x27, x28, [x13, #64]
+                    ldp x30, x29, [x13, #96]
 
                     ldp x15, x16, [x13, #80]
                     msr ELR_EL1, x15
                     msr SPSR_EL1, x16
-
-                    ldp x30, x29, [x13, #96]
 
                     isb
                     eret
@@ -253,10 +260,6 @@ where
         #[cfg(feature = "log_debug")]
         kprintln!("actor: {}, fp: {}, event: {}, sp: {stack}", actor as u64, function as u64, event as *mut _ as u64);
 
-        // TODO - THIS NEEDS TO BE CHECKED
-        // Missing rust registers (in(reg) actor, ...)
-        // Missing restore after label 1:
-        // Missing sanity check to see if sp and reg vals are clobbered / restored correctly by llvm
         unsafe {
             asm!(
                 "msr DAIFSet, #0b1111",
@@ -268,8 +271,7 @@ where
 
                 "adr x0, 1f",
                 "stp x0, x9, [sp, #-16]!",      // Save return addr and SP
-
-                "stp x12, xzr, [sp, #-16]!",    // Save xptr and padding (SP ~ 16 Byte)
+                "stp x12, xzr, [sp, #-16]!",    // Save event-ptr and padding (SP ~ 16 Byte)
 
                 "msr SP_EL0, x10",
                 "msr ELR_EL1, x11",
@@ -296,7 +298,7 @@ where
     #[inline(never)]
     extern "C" fn execute_msg(
         actor: *mut A,
-        message: A::Message,
+        message: *const A::Message,
         event: &mut Option<UserExecutorEvent>,
         stack: u64,
         function: extern "C" fn(*mut A, &A::Message) -> !,
@@ -312,8 +314,7 @@ where
 
                 "adr x0, 1f",
                 "stp x0, x9, [sp, #-16]!",      // Save return addr and SP
-
-                "stp x12, xzr, [sp, #-16]!",    // Save xptr and padding (SP ~ 16 Byte)
+                "stp x12, xzr, [sp, #-16]!",    // Save event-ptr and padding (SP ~ 16 Byte)
 
                 "msr SP_EL0, x10",
                 "msr ELR_EL1, x11",
@@ -331,7 +332,7 @@ where
                 in("x11") function as u64,
                 in("x12") event as *mut _ as u64,
                 in("x13") actor as u64,
-                in("x14") &message as *const _ as u64,
+                in("x14") message as *const _ as u64,
 
                 options(preserves_flags),
                 clobber_abi("C")
@@ -339,27 +340,3 @@ where
         }
     }
 }
-
-// TODO: Verify if this struct is correct
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct StackState {
-    // +0x00 (SP)
-    pub event: u64,
-    pub _pad_event: u64,
-
-    // x19 - x30
-    pub regs: [u64; 12],
-
-    // +0x70
-    pub elr_el1: u64,
-    pub spsr_el1: u64,
-
-    // +0x80
-    pub saved_kernel_sp: u64,
-    pub inline_return_addr: u64,
-}
-
-const _: () = {
-    assert!(core::mem::size_of::<StackState>() == 144);
-};

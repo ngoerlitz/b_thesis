@@ -21,7 +21,7 @@ impl Actor<UserEnvironment> for UserSender {
     ) -> Result<(), ActorCreateError> {
         uprintln!("[1] CREATING UserSender");
 
-        self.target.send("[1] Hello world, this is a message from one of your buddies! Another user actor").await;
+        self.target.send("TEST MESSAGE").await;
 
         Ok(())
     }

@@ -1,7 +1,7 @@
 .globl _secondary_release
 .globl _secbt
-.extern __stack_el1_top
-.extern __stack_el1_size
+.extern __kstack_end
+.extern KSTACK_SIZE
 
 /*
 _park_secondary:
@@ -30,11 +30,11 @@ _park_secondary:
 
 _secondary_release:
     // Load stack for core (this is __KSTACK_BASE - (__KSTACK_SIZE * CoreID))
-    adrp x1, __stack_el1_top
-    add x1, x1, :lo12:__stack_el1_top
+    adrp x1, __kstack_end
+    add x1, x1, :lo12:__kstack_end
 
-    adrp x2, __stack_el1_size
-    add x2, x2, :lo12:__stack_el1_size
+    adrp x2, KSTACK_SIZE
+    add x2, x2, :lo12:KSTACK_SIZE
 
     msub x3, x0, x2, x1
     mov sp, x3

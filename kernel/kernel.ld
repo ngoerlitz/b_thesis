@@ -6,14 +6,11 @@ __rpi_phys_binary_load_addr = 0x80000;
 /* ---- constants ---- */
 HEAP_SIZE    = 1024M;
 
-NUM_USTACKS = 4;
+NUM_CORES = 4;
 USTACK_SIZE = 16K;
+KSTACK_SIZE = 16K;
 
 ENTRY(_start)
-
-/* Program headers for ELF loaders (e.g. QEMU -kernel with ELF) */
-__stack_el1_top = (0x80000 - 0x10);
-__stack_el1_size = 16K;
 
 SECTIONS
 {
@@ -63,6 +60,12 @@ SECTIONS
         __bss_end_exclusive = .;
     }
 
+    .kernel_stack (NOLOAD) : ALIGN(0x200000)
+    {
+        . = . + (KSTACK_SIZE * NUM_CORES);
+        __kstack_end = .;
+    }
+
     /***********************************************************************************************
     * Misc
     ***********************************************************************************************/
@@ -93,7 +96,7 @@ SECTIONS
     .user_stack (NOLOAD) : ALIGN(16)
     {
         __ustack_start = .;
-        . = . + (USTACK_SIZE * NUM_USTACKS);
+        . = . + (USTACK_SIZE * NUM_CORES);
         __ustack_end = .;
     }
 

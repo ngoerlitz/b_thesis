@@ -28,7 +28,8 @@ pub static UART0: spin::mutex::Mutex<PL011> =
     spin::mutex::Mutex::new(unsafe { PL011::new(bsp::constants::UART0_BASE) });
 
 linker_symbols! {
-    EL1_STACK_TOP = __stack_el1_top;
+    EL1_STACK_TOP = __kstack_end;
+    EL1_STACK_SIZE = KSTACK_SIZE;
 }
 
 unsafe extern "C" {
@@ -68,7 +69,11 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
         ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
     }
 
-    kprintln!("[INFO] Kernel Initializing. EL1-STACK: {:#X}", EL1_STACK_TOP());
+    kprintln!("[INFO] Kernel Initializing.");
+    kprintln!("STACKS");
+    for i in 0..4 {
+        kprintln!("{i} ]{:#0X} - {:#0X}]", EL1_STACK_TOP() - (EL1_STACK_SIZE() * (i + 1)), EL1_STACK_TOP() - (EL1_STACK_SIZE() * i));
+    }
 
     {
         let mut irq = RootEnvironment::get().irq_manager().write();

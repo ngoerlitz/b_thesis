@@ -34,6 +34,12 @@ impl Actor<UserEnvironment> for UserActor {
         async move {
             uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
             uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
             Ok(())
         }
     }

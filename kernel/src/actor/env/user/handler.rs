@@ -2,11 +2,11 @@ use crate::actor::env::user::ctx::UserEnvironmentHandleCtx;
 use crate::actor::env::user::environment::UserEnvironment;
 use crate::utils::memory::leaking_heap_memory_alloc::NoOpMemoryAllocator;
 use alloc::boxed::Box;
-use core::arch::asm;
+use core::arch::{asm, naked_asm};
 use core::pin::pin;
 use core::task::{Context, Poll, Waker};
 use zcene_core::actor::Actor;
-use crate::{svc_call, uprintln};
+use crate::{kprintln, svc_call, uprintln};
 use crate::isr::SvcType;
 
 #[unsafe(link_section = ".user_text")]
@@ -14,7 +14,6 @@ pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *
     uprintln!("[USER_HANDLER 1/2] CREATE HANDLER!!! A: {:#X}", actor as u64);
     svc_call!(SvcType::Test);
     uprintln!("[USER_HANDLER 2/2] CREATE HANDLER!!! A: {:#X}", actor as u64);
-
 
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
@@ -31,14 +30,28 @@ pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *
 }
 
 #[unsafe(link_section = ".user_text")]
+extern "C" fn make_svc() {
+    unsafe {
+        asm!(
+            "svc #0x5",
+            clobber_abi("C")
+        )
+    }
+}
+
+#[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
     actor: *mut A,
     msg: &A::Message,
 ) -> ! {
-    // TODO: Adding this svc_call breaks things! Some regs may not be put back to their
-    // TODO: correct values. This needs to be checked (with GDB)
-    // svc_call!(SvcType::Test);
+    let ptr = msg as *const _ as u64;
+    make_svc(); // TODO: @Justus, ne Idee?
+
+    let ptr_after = msg as *const _ as u64;
     // uprintln!("[USER_HANDLER] MESSAGE HANDLER!!! A: {:#X}. Message: {:?}", actor as u64, msg);
+    uprintln!("HANDLER-MESSAGE @ : {:p}", msg);
+    // 0xa0ddf8
+    // 0 ]0xA0C000 - 0xA10000]
 
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
