@@ -6,123 +6,100 @@
 .extern unhandled_irq
 .extern __stack_el0_top
 
-/*
- * Must by 16 Byte aligned as per AAPCS64
- */
-.equ CONTEXT_SIZE, 272
-
-/*
- * This macro stores all of the general purpose registers (x0 - x29) on the stack pointer `sp`
- *
- * 60 Bytes (15 Instructions * 4 Bytes)
- */
-.macro STORE_GP_REGS
-    // store general purpose registers
-    stp x0, x1,   [sp, #16 *  0]
-    stp x2, x3,   [sp, #16 *  1]
-    stp x4, x5,   [sp, #16 *  2]
-    stp x6, x7,   [sp, #16 *  3]
-    stp x8, x9,   [sp, #16 *  4]
-    stp x10, x11, [sp, #16 *  5]
-    stp x12, x13, [sp, #16 *  6]
-    stp x14, x15, [sp, #16 *  7]
-    stp x16, x17, [sp, #16 *  8]
-    stp x18, x19, [sp, #16 *  9]
-    stp x20, x21, [sp, #16 * 10]
-    stp x22, x23, [sp, #16 * 11]
-    stp x24, x25, [sp, #16 * 12]
-    stp x26, x27, [sp, #16 * 13]
-    stp x28, x29, [sp, #16 * 14]
-.endm
-
-/*
- * This macro stores the special registers `ELR_EL1` and `SPSR_EL1` at the offsets matching the `STORE_GP_REGS`
- * macro.
- *
- * 12 Bytes (3 Instructions * 4 Bytes)
- */
-.macro STORE_SPECIAL_REGS
-    mrs x0, ELR_EL1
-    mrs x1, SPSR_EL1
-    stp x0, x1,   [sp, #16 * 15]
-.endm
-
-/*
- *
- * 20 Bytes (5 Instructions * 4 Bytes)
- * + sizeof(STORE_GP_REGS) = 60
- * + sizeof(STORE_SPECIAL_REGS) = 12
- * = 92 Bytes
- */
-.macro ISR_STORE_STACK
-    msr DAIFSet, #0b1111 // D/A/I/F mask
-    sub sp, sp, #CONTEXT_SIZE
-
-    STORE_GP_REGS
-    STORE_SPECIAL_REGS
-
-    // LR (x30) and 8-byte padding to keep 16B alignment
-    str x30, [sp, #16 * 16]        // offset 256
-    str xzr, [sp, #16 * 16 + 8]    // pad to 272
-
-    // arg0 = &ExceptionFrame
-    mov x0, sp
-.endm
-
 .macro VECTOR label
     .balign 0x80
+    msr DAIFSet, #0b1111
 
-    ISR_STORE_STACK
+    // Save all registers (x0 - x30)
+    sub sp, sp, #256
+    stp x30, xzr, [sp, #240]    // [SP + 240] [SP + 248]
+    stp x28, x29, [sp, #224]    // [SP + 224] [SP + 232]
+    stp x26, x27, [sp, #208]    // [SP + 208] [SP + 216]
+    stp x24, x25, [sp, #192]    // [SP + 192] [SP + 200]
+    stp x22, x23, [sp, #176]    // [SP + 176] [SP + 184]
+    stp x20, x21, [sp, #160]    // [SP + 160] [SP + 168]
+    stp x18, x19, [sp, #144]    // [SP + 144] [SP + 152]
+    stp x16, x17, [sp, #128]    // [SP + 128] [SP + 136]
+    stp x14, x15, [sp, #112]    // [SP + 112] [SP + 120]
+    stp x12, x13, [sp, #96]     // [SP + 96 ] [SP + 104]
+    stp x10, x11, [sp, #80]     // [SP + 80 ] [SP + 88 ]
+    stp x8, x9,   [sp, #64]     // [SP + 64 ] [SP + 72 ]
+    stp x6, x7,   [sp, #48]     // [SP + 48 ] [SP + 56 ]
+    stp x4, x5,   [sp, #32]     // [SP + 32 ] [SP + 40 ]
+    stp x2, x3,   [sp, #16]     // [SP + 16 ] [SP + 24 ]
+    stp x0, x1,   [sp, #0]      // [SP + 0  ] [SP + 8  ]
+
+    sub sp, sp, #16
+    mrs x0, ELR_EL1
+    mrs x1, SPSR_EL1
+    stp x0, x1, [sp, #0]        // [SP + 0  ] [SP + 8  ]
+
+    mov x0, sp
 
     bl \label
     b .exit_exception
 .endm
 
-.macro VECTOR_SYNC label
-    .balign 0x80
+_el0_irq_entry:
+    msr DAIFSet, #0b1111
 
-    ISR_STORE_STACK
+    // Save all registers (x0 - x30)
+    sub sp, sp, #256
+    stp x28, x29, [sp, #224]    // [SP + 224] [SP + 232]
+    stp x26, x27, [sp, #208]    // [SP + 208] [SP + 216]
+    stp x24, x25, [sp, #192]    // [SP + 192] [SP + 200]
+    stp x22, x23, [sp, #176]    // [SP + 176] [SP + 184]
+    stp x20, x21, [sp, #160]    // [SP + 160] [SP + 168]
+    stp x18, x19, [sp, #144]    // [SP + 144] [SP + 152]
+    stp x16, x17, [sp, #128]    // [SP + 128] [SP + 136]
+    stp x14, x15, [sp, #112]    // [SP + 112] [SP + 120]
+    stp x12, x13, [sp, #96]     // [SP + 96 ] [SP + 104]
+    stp x10, x11, [sp, #80]     // [SP + 80 ] [SP + 88 ]
+    stp x8, x9,   [sp, #64]     // [SP + 64 ] [SP + 72 ]
+    stp x6, x7,   [sp, #48]     // [SP + 48 ] [SP + 56 ]
+    stp x4, x5,   [sp, #32]     // [SP + 32 ] [SP + 40 ]
+    stp x2, x3,   [sp, #16]     // [SP + 16 ] [SP + 24 ]
+    stp x0, x1,   [sp, #0]      // [SP + 0  ] [SP + 8  ]
+    
+    mrs x0, SP_EL0
+    stp x30, x0, [sp, #240]    // [SP + 240] [SP + 248]
 
-    // We are storing the address of the previous SP, which would contain
-    // the EL1 execution stack from before the EL1 -> EL0 switch. If the SVC
-    // requests an EL0 -> EL1 transition, these values are used to restore the
-    // previous EL1 state. In this case, the following `.exit_exception` is
-    // NOT called.
-    add x1, sp, #CONTEXT_SIZE
-    bl \label
-    b .exit_exception
+    sub sp, sp, #16
+    mrs x0, ELR_EL1
+    mrs x1, SPSR_EL1
+    stp x0, x1, [sp, #0]        // [SP + 0  ] [SP + 8  ]
 
-.endm
+    mov x0, sp
+    add x1, sp, #272
+
+    bl el0_irq
+1:
+    // Unreachable.
+    b 1b
 
 // Callee saved registers [x19-x28]
 _el0_syscall_entry:
     msr DAIFSet, #0b1111    // Disable interrupts
 
-    // Move args
-    mov x15, x0
-    mov x16, x1
-
     // SP at stack entry -> should equal a pointer to the EL1Context
     mov x3, sp
 
     sub sp, sp, #16
-    stp x30, x29, [sp, #0]  // [SP + 0 ]
-
-    sub sp, sp, #16
-    mrs x0, ELR_EL1
-    mrs x1, SPSR_EL1
-    stp x0, x1, [sp, #0]    // [SP + 0 ] [SP + 8 ]
+    mrs x15, ELR_EL1
+    mrs x16, SPSR_EL1
+    stp x15, x16, [sp, #0]    // [SP + 0 ] [SP + 8 ]
 
     // x19 - x28 => 10 Regs * 8 Bytes = 80 Bytes
-    sub sp, sp, #80
+    sub sp, sp, #96
+    stp x29, x30, [sp, #80] // [SP + 80] [SP + 88]
     stp x27, x28, [sp, #64] // [SP + 64] [SP + 72]
     stp x25, x26, [sp, #48] // [SP + 48] [SP + 56]
     stp x23, x24, [sp, #32] // [SP + 32] [SP + 40]
     stp x21, x22, [sp, #16] // [SP + 16] [SP + 24]
     stp x19, x20, [sp, #0]  // [SP + 0 ] [SP + 8 ]
 
-    mov x0, x15
-    mov x1, x16
+    mov x0, x0
+    mov x1, x1
     mov x2, sp
     mov x3, x3
     bl el0_sync
@@ -160,7 +137,10 @@ el1_vectors:
 //------------------------------------------------------------------------------
     .balign 0x80                   // VBAR_EL1 + 0x400  EL0: Synchronous
     b _el0_syscall_entry
-    VECTOR el0_irq                 // VBAR_EL1 + 0x480  EL0: IRQ
+
+    .balign 0x80                   // VBAR_EL1 + 0x480  EL0: IRQ
+    b _el0_irq_entry
+
     VECTOR unhandled_irq           // VBAR_EL1 + 0x500  EL0: FIQ
     VECTOR unhandled_irq           // VBAR_EL1 + 0x580  EL0: SError
 
@@ -174,32 +154,30 @@ el1_vectors:
 
 
 .exit_exception:
-    // restore link register
-    ldr x30, [sp, #16 * 16]
+    ldp x0, x1, [sp, #0]
+    msr ELR_EL1, x0
+    msr SPSR_EL1, x1
 
-    // restore exception link register and saved processor state register
-    ldp x0, x1, [sp, #16 * 15]
-    msr elr_el1, x0
-    msr spsr_el1, x1
+    add sp, sp, #16
 
-    // restore general purpose registers
-    ldp x28, x29, [sp, #16 * 14]
-    ldp x26, x27, [sp, #16 * 13]
-    ldp x24, x25, [sp, #16 * 12]
-    ldp x22, x23, [sp, #16 * 11]
-    ldp x20, x21, [sp, #16 * 10]
-    ldp x18, x19, [sp, #16 * 9]
-    ldp x16, x17, [sp, #16 * 8]
-    ldp x14, x15, [sp, #16 * 7]
-    ldp x12, x13, [sp, #16 * 6]
-    ldp x10, x11, [sp, #16 * 5]
-    ldp x8, x9, [sp, #16 * 4]
-    ldp x6, x7, [sp, #16 * 3]
-    ldp x4, x5, [sp, #16 * 2]
-    ldp x2, x3, [sp, #16 * 1]
-    ldp x0, x1, [sp, #16 * 0]
+    ldp x0, x1,   [sp, #0]
+    ldp x2, x3,   [sp, #16]
+    ldp x4, x5,   [sp, #32]
+    ldp x6, x7,   [sp, #48]
+    ldp x8, x9,   [sp, #64]
+    ldp x10, x11, [sp, #80]
+    ldp x12, x13, [sp, #96]
+    ldp x14, x15, [sp, #112]
+    ldp x16, x17, [sp, #128]
+    ldp x18, x19, [sp, #144]
+    ldp x20, x21, [sp, #160]
+    ldp x22, x23, [sp, #176]
+    ldp x24, x25, [sp, #192]
+    ldp x26, x27, [sp, #208]
+    ldp x28, x29, [sp, #224]
+    ldp x30, xzr, [sp, #240]
 
-    // restore stack pointer
-    add sp, sp, #CONTEXT_SIZE
+    add sp, sp, #256
 
+    isb
     eret

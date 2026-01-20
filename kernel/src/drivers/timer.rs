@@ -28,6 +28,14 @@ impl EL1PhysicalTimer {
         CNTP_CTL_EL0.clear_bit(0);
     }
 
+    pub fn mask_irq(&mut self) {
+        CNTP_CTL_EL0.enable_bit(CNTP_CTL_EL0::BIT_IMASK);
+    }
+
+    pub fn unmask_irq(&mut self) {
+        CNTP_CTL_EL0.clear_bit(CNTP_CTL_EL0::BIT_IMASK);
+    }
+
     fn get_timer_details(&self) -> (u64, u64) {
         (CNTPCT_EL0.read(), CNTFRQ_EL0.read())
     }
@@ -78,7 +86,7 @@ impl Driver for EL1PhysicalTimer {
     }
 
     fn disable(&mut self) {
-        todo!()
+        CNTP_CTL_EL0.write(CNTP_CTL_EL0::DISABLE);
     }
 }
 

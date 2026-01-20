@@ -4,6 +4,7 @@ pub(crate) mod context;
 pub(crate) mod el;
 pub(crate) mod handlers;
 pub(crate) mod svc_ctx;
+pub(crate) mod irq_ctx;
 
 #[repr(u16)]
 #[derive(Debug)]

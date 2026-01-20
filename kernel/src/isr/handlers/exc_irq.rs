@@ -19,7 +19,7 @@ extern "C" fn exc_irq(ctx: &mut ISRContext) {
         get_cpu_timer().now().ticks(),
         irq_num
     );
-
+    
     irq_svc.dispatch(irq_num.into(), ctx);
 
     GIC400::write_eoir(iar);

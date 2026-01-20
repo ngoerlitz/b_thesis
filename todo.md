@@ -1,19 +1,6 @@
-- [X] EL1 -> EL0 switch in UserActor [0.5 Day] 
-- [X] Message Passing via Copying in UserActor --> basically done through SVC, once [0;1] complete. [1 Day] X
-
-- [] UserActor must be able to send messages to other actors too. This requires some sort of mapping from <ActorId <-> Channel> [1 Day -- High Priority!!]
-     this is required in order to actually send messages and is therefore required to be completed by Tuesday's meeting, sonst sehr peinlich! 
-     This happens through a syscall interface 
-     It would be okay to drop multi-core until this is complete on Monday. I'll do multi-core afterwards. 
-
-- [] Simplify Kernel Memory Layout (ld script) + Refactor MMU [0.5 Day]
 - [] Kernel memory manager (stack, pages, etc.) [1 Day]
 
-=== [3 Days] 
--- Latest 15. Jan
-
 - [] Multi-Core Support: [1 Week]
-    - [] Secondary Core bringup on Hardware + QEMU [1 Day]
     - [] MMU support for multiple cores -> multiple PTEs for each core with specific addresses for Actors -->
       RootEnvironment {actors: HashMap<...>}? [6 Days]
 

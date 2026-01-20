@@ -3,7 +3,7 @@ use core::arch::asm;
 use kernel::actor::env::root::environment::RootEnvironment;
 use kernel::actor::env::user::environment::UserEnvironment;
 use zcene_core::actor::{Actor, ActorCreateError, ActorEnvironment, ActorFuture, ActorHandleError, ActorMessageSender};
-use kernel::uprintln;
+use kernel::{kprintln, uprintln};
 
 #[derive(Default)]
 pub struct UserActor {
@@ -23,6 +23,7 @@ impl Actor<UserEnvironment> for UserActor {
         &'a mut self,
         context: <UserEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
+
         Ok(())
     }
 
@@ -31,15 +32,30 @@ impl Actor<UserEnvironment> for UserActor {
         &mut self,
         context: <UserEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>,
     ) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
+        let mut counter = 0;
+
         async move {
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
-            uprintln!("[I RECEIVED THE MESSAGE] -- {}", context.message);
+            loop {
+                let mut sp: u64;
+                unsafe {
+                    asm!("mov {}, sp", out(reg) sp);
+                }
+                uprintln!("USER_SP: {sp:X}");
+
+                uprintln!("[I RECEIVED THE MESSAGE [{}]] -- {}", &counter, context.message);
+
+                for _ in 0..1_000_000 {
+                    unsafe {
+                        asm!("nop")
+                    }
+                }
+
+                counter += 1;
+                if counter == 100 {
+                    break;
+                }
+            }
+
             Ok(())
         }
     }

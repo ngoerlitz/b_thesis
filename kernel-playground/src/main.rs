@@ -52,32 +52,32 @@ impl Actor<RootEnvironment> for RootActor {
         &'a mut self,
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
-        let new_actor = ReceivingActor::default();
+        // let new_actor = ReceivingActor::default();
 
         let user_addr = unsafe {
             RootEnvironment::get()
-                .spawn_user(UserActor::default(), vec![])
+                .spawn_user(0, UserActor::default(), vec![])
                 .unwrap()
         };
-
+        //
         let user_addr2 = unsafe {
             RootEnvironment::get()
-                .spawn_user(UserSender::new(
+                .spawn_user(2, UserSender::new(
                     UserViewAddress::new(0, PhantomData)
                 ), vec![Box::new(user_addr.clone())])
                 .unwrap()
         };
 
-        // user_addr.send("Hello world, this is my message to you!").await;
+        user_addr.send("Hello world, this is my message to you!").await;
         // user_addr.send("Hello world, is my message to you!").await;
         // user_addr.send("Hello world, this is my to you!").await;
         // user_addr.send(" world, this is my message to you!").await;
-        kprintln!("[ROOT] Sent message to `user_addr` channel");
-
-        let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };
-
-        addr.send(format!("Hello World, this is a message from {}!", self.id).into())
-            .await;
+        // kprintln!("[ROOT] Sent message to `user_addr` channel");
+        //
+        // let addr = unsafe { RootEnvironment::get().spawn(new_actor).unwrap() };
+        //
+        // addr.send(format!("Hello World, this is a message from {}!", self.id).into())
+        //     .await;
         Ok(())
     }
 

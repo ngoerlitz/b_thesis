@@ -25,6 +25,10 @@ impl<T: SerialDriver> ActorRootLoggerService<T> {
     pub fn writer<'a>(&'a self) -> impl Write + 'a {
         ActorRootWriter { service: self }
     }
+
+    pub fn read_char(&self) -> Option<u8> {
+        aarch64::irq::run_masked(|| self.driver.lock().read_byte().ok())
+    }
 }
 
 pub struct ActorRootWriter<'a, T: SerialDriver> {

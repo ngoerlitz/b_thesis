@@ -46,21 +46,18 @@ pub unsafe extern "C" fn el0_sync(arg0: u64, arg1: u64, ctx: *const SyscallConte
     unsafe {
         asm!(
             // Restore callee-saved regs from EL1Context
-            "ldp x29, x30, [x1, #32]",
-            "ldp x27, x28, [x1, #48]",
-            "ldp x25, x26, [x1, #64]",
-            "ldp x23, x24, [x1, #80]",
-            "ldp x21, x22, [x1, #96]",
-            "ldp x19, x20, [x1, #112]",
+            "ldp x29, x30, [x1, #112]",
+            "ldp x27, x28, [x1, #96]",
+            "ldp x25, x26, [x1, #80]",
+            "ldp x23, x24, [x1, #64]",
+            "ldp x21, x22, [x1, #48]",
+            "ldp x19, x20, [x1, #32]",
 
             // Load resume PC and SP
-            "ldr x2, [x1, #16]",   // ret_addr
-            "msr ELR_EL1, x2",
+            "ldp x0, x1, [x1, #0]",
+            "msr ELR_EL1, x0",
+            "mov sp, x1",
 
-            "ldr x2, [x1, #24]",   // saved_sp
-            "mov sp, x2",
-
-            // Return to EL1h (pick DAIF mask as you want; this matches your earlier constant)
             "mov x2, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",
             "msr SPSR_EL1, x2",
 
@@ -72,95 +69,6 @@ pub unsafe extern "C" fn el0_sync(arg0: u64, arg1: u64, ctx: *const SyscallConte
             options(noreturn),
         );
     }
-
-    /*
-    match Svc::from(svc_num) {
-        Svc::PrintMsg => {
-            let slice = slice::from_raw_parts(arg0 as *const u8, arg1 as usize);
-            kprintln!("User: {}", str::from_utf8_unchecked(slice));
-        }
-        Svc::Test => {
-            unsafe {
-                *(*ctx_el1).event = Some(UserExecutorEvent::SystemCall(SystemCallExecutorType {
-                    ctx: (*ctx).clone(),
-                    args: [arg0, arg1],
-                    svc_num
-                }));
-            }
-
-            // Return control to the state in EL1Context -> the actor's executor
-            unsafe {
-                asm!(
-                // Restore callee-saved regs from EL1Context
-                "ldp x29, x30, [x1, #32]",
-                "ldp x27, x28, [x1, #48]",
-                "ldp x25, x26, [x1, #64]",
-                "ldp x23, x24, [x1, #80]",
-                "ldp x21, x22, [x1, #96]",
-                "ldp x19, x20, [x1, #112]",
-
-                // Load resume PC and SP
-                "ldr x2, [x1, #16]",   // ret_addr
-                "msr ELR_EL1, x2",
-
-                "ldr x2, [x1, #24]",   // saved_sp
-                "mov sp, x2",
-
-                // Return to EL1h (pick DAIF mask as you want; this matches your earlier constant)
-                "mov x2, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",
-                "msr SPSR_EL1, x2",
-
-                "isb",
-                "eret",
-
-                in("x1") (ctx_el1 as u64),
-
-                options(noreturn),
-                );
-            }
-        },
-        Svc::ReturnEl1 => {
-            log_dbg_naked!("RETURN_ADDR: {:#X}", unsafe {&*ctx_el1}.ret_addr as u64);
-            log_dbg_naked!("{:?}", unsafe {&*ctx_el1});
-
-            unsafe {
-                asm!(
-                    // Restore callee-saved regs from EL1Context
-                    "ldp x29, x30, [x1, #32]",
-                    "ldp x27, x28, [x1, #48]",
-                    "ldp x25, x26, [x1, #64]",
-                    "ldp x23, x24, [x1, #80]",
-                    "ldp x21, x22, [x1, #96]",
-                    "ldp x19, x20, [x1, #112]",
-
-                    // Load resume PC and SP
-                    "ldr x2, [x1, #16]",   // ret_addr
-                    "msr ELR_EL1, x2",
-
-                    "ldr x2, [x1, #24]",   // saved_sp
-                    "mov sp, x2",
-
-                    // Return to EL1h (pick DAIF mask as you want; this matches your earlier constant)
-                    "mov x2, #( (1<<9) | (1<<8) | (0<<7) | (1<<6) | 0b0101 )",
-                    "msr SPSR_EL1, x2",
-
-                    "isb",
-                    "eret",
-
-                    in("x1") (ctx_el1 as u64),
-
-                    options(noreturn),
-                );
-            }
-        }
-        Svc::SendMsg => {
-            unimplemented!();
-        }
-        _ => {
-            el0_handler();
-        }
-    }
-    */
 }
 
 const OFF_SAVED_SP: usize = 0x00;

@@ -105,22 +105,10 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
 
         let timer = get_cpu_timer();
         timer.init();
-        timer.set_interval(Duration::from_millis(100));
-        // let _ = timer.enable();
-
-        for _ in 0..100_000 {
-            unsafe { asm!("nop") }
-        }
 
         irq.inner_mut().core_init();
         kprintln!("{}", timer);
         kprintln!("{}", irq.inner());
-    }
-
-    cpu::enable_irq();
-
-    for _ in 0..500_000 {
-        unsafe { asm!("nop") }
     }
 
     let _ = RootEnvironment::get().spawn(actor).unwrap();

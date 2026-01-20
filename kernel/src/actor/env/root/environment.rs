@@ -20,6 +20,7 @@ use core::alloc::Allocator;
 use core::fmt::Debug;
 use core::iter::Map;
 use core::marker::PhantomData;
+use core::num::{NonZero, NonZeroU64, NonZeroUsize};
 use spin::RwLock;
 use zcene_core::actor::{Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference, ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress, ActorMessageChannelSender, ActorSpawnError};
 use zcene_core::future::runtime::{FutureRuntimeHandler, FutureRuntimeReference};
@@ -58,6 +59,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
 
     pub fn spawn_user<A: Actor<UserEnvironment>>(
         self: &ActorEnvironmentReference<Self>,
+        offset: usize,
         mut actor: A,
         message_handlers: Vec<
             Box<
@@ -71,12 +73,13 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
         let (sender, receiver) = ActorMessageChannel::<A::Message>::new_unbounded();
         let allocator = self.allocator().clone();
 
-        self.future_runtime.spawn(async {
+        self.future_runtime.spawn(async move {
             UserExecutor::<_, H>::new(
+                offset,
                 allocator,
                 Box::new(actor),
                 receiver,
-                None,
+                NonZeroU64::new(100),
                 message_handlers,
                 PhantomData,
             )

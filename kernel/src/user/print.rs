@@ -32,7 +32,7 @@ impl<'a> fmt::Write for StackBuf<'a> {
 
 #[unsafe(link_section = ".user_text")]
 pub fn user_print(args: fmt::Arguments) {
-    let mut buffer = [0u8; 512];
+    let mut buffer = [0u8; 1024];
     let mut sb = StackBuf::new(&mut buffer);
 
     match fmt::write(&mut sb, args) {
