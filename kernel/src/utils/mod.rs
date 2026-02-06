@@ -3,3 +3,4 @@ pub(crate) mod memory;
 pub mod print;
 pub(crate) mod regs;
 pub(crate) mod debug;
+pub(crate) mod stack_buf;

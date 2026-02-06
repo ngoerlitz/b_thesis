@@ -16,14 +16,16 @@ macro_rules! kprintln {
     }}
 }
 
-pub fn kprint(args: core::fmt::Arguments) {
-    let mut logger = RootEnvironment::get().logger().writer();
+pub fn kprint(mut args: core::fmt::Arguments) {
+    let mut logger = RootEnvironment::get().logger();
 
     #[cfg(feature = "log_cores")]
-    let cpuid = cpu::cpuid();
+    {
+        let cpuid = cpu::cpuid();
+        let _ = logger.write_fmt_locked(format_args!("[CORE: {}], {}", cpuid, args));
+    }
 
-    #[cfg(feature = "log_cores")]
-    let _ = core::fmt::write(&mut logger, format_args!("[CORE: {}]", cpuid));
-
-    let _ = core::fmt::write(&mut logger, args);
+    #[cfg(not(feature = "log_cores"))]
+    let _ = logger.write_fmt_locked(args);
+    //let _ = core::fmt::write(&mut logger, args);
 }

@@ -6,7 +6,7 @@ use zcene_core::actor::{Actor, ActorEnvironment, ActorFuture, ActorHandleError};
 #[derive(Default)]
 pub struct ReceivingActor;
 
-pub type ReceivingActorMessage = String;
+pub type ReceivingActorMessage = u64;
 
 impl Actor<RootEnvironment> for ReceivingActor {
     type Message = ReceivingActorMessage;
@@ -16,7 +16,7 @@ impl Actor<RootEnvironment> for ReceivingActor {
         context: <RootEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>,
     ) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
         async move {
-            kprintln!("ReceivingActor received message: \"{}\"", context.message);
+            kprintln!("ReceivingActor received message: \"{:?}\"", context.message);
 
             Ok(())
         }

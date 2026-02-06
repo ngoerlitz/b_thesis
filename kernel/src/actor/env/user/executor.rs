@@ -96,10 +96,6 @@ where
 
         kprintln!("USER: AFTER HANDLE");
         while let Some(message) = self.receiver.receive().await {
-            // &'static str
-            kprintln!("USER: Received message: {:?} | Size: {}", &message, size_of::<A::Message>());
-
-            // Todo, reserve some space to page aligned memory to store the message.
             let b = Box::new(message);
             let ptr: u64 = Box::into_raw(b) as *const _ as u64;
 
@@ -157,9 +153,11 @@ where
 
         // Todo: User stack (this should be from a proper KernelMemoryManager)
         let cpuid = cpuid() as usize;
-        let stack = STACK_EL0_TOP() - ((0 + self.page_offset) * 0x8000);
+        let stack = STACK_EL0_TOP() - ((cpuid + self.page_offset) * 0x8000);
 
         self.enable_deadline();
+
+        kprintln!("[HANDLE -- {}]: SP: {:#X}", self.page_offset, stack);
 
         func(&mut self.actor, &mut event, stack as u64);
 
@@ -173,17 +171,21 @@ where
                          SvcType::PrintMsg => {
                             unsafe {
                                 let slice = slice::from_raw_parts(ctx.args[0] as *const u8, ctx.args[1] as usize);
-                                kprintln!("User: {}", str::from_utf8_unchecked(slice));
+                                match str::from_utf8(slice) {
+                                    Ok(s) => kprintln!("User: {}", s),
+                                    Err(_) => kprintln!("Invalid UTF-8 string"),
+                                }
 
                                 Self::continue_from_syscall(&mut event, &ctx.ctx);
                             }
-                        },
+                         },
                         SvcType::Test => {
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
                         SvcType::SendMsg => {
                             match self.message_handlers.get(ctx.args[0] as usize) {
                                 Some(handler) => {
+                                    kprintln!("MSG_PTR: {:X}", ctx.args[1] as u64);
                                     let _result = handler.send(&Global, ctx.args[1] as *const ()).await;
                                 },
                                 None => todo!()

@@ -96,7 +96,7 @@ SECTIONS
     .user_stack (NOLOAD) : ALIGN(16)
     {
         __ustack_start = .;
-        . = . + (USTACK_SIZE * NUM_CORES);
+        . = . + (2 * USTACK_SIZE * NUM_CORES);
         __ustack_end = .;
     }
 

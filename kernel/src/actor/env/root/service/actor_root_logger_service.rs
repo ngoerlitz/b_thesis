@@ -1,3 +1,4 @@
+use core::fmt;
 use crate::hal::serial::{SerialDriver, SerialError};
 use crate::platform::aarch64;
 use crate::platform::aarch64::cpu;
@@ -20,6 +21,13 @@ impl<T: SerialDriver> ActorRootLoggerService<T> {
         S: AsRef<str>,
     {
         aarch64::irq::run_masked(|| self.driver.lock().write_str(string.as_ref()))
+    }
+
+    pub fn write_fmt_locked(&self, args: fmt::Arguments<'_>) -> fmt::Result {
+        aarch64::irq::run_masked(|| {
+            let mut drv = self.driver.lock();
+            drv.write_fmt(args)
+        })
     }
 
     pub fn writer<'a>(&'a self) -> impl Write + 'a {

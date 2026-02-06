@@ -30,29 +30,10 @@ pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *
 }
 
 #[unsafe(link_section = ".user_text")]
-extern "C" fn make_svc() {
-    unsafe {
-        asm!(
-            "svc #0x5",
-            clobber_abi("C")
-        )
-    }
-}
-
-#[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
     actor: *mut A,
     msg: &A::Message,
 ) -> ! {
-    let ptr = msg as *const _ as u64;
-    make_svc(); // TODO: @Justus, ne Idee?
-
-    let ptr_after = msg as *const _ as u64;
-    // uprintln!("[USER_HANDLER] MESSAGE HANDLER!!! A: {:#X}. Message: {:?}", actor as u64, msg);
-    uprintln!("HANDLER-MESSAGE @ : {:p}", msg);
-    // 0xa0ddf8
-    // 0 ]0xA0C000 - 0xA10000]
-
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());

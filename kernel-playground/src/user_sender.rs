@@ -4,6 +4,7 @@ use kernel::actor::env::user::environment::UserEnvironment;
 use kernel::uprintln;
 use crate::user::{UserActor};
 use kernel_derive::Constructor;
+use crate::receiver::ReceivingActor;
 
 #[derive(Constructor)]
 pub struct UserSender {
@@ -21,7 +22,8 @@ impl Actor<UserEnvironment> for UserSender {
     ) -> Result<(), ActorCreateError> {
         uprintln!("[1] CREATING UserSender");
 
-        self.target.send("TEST MESSAGE").await;
+        // self.target.send(*b"HelloWorld\0\0\0\0\0").await;
+        self.target.send(512).await;
 
         Ok(())
     }

@@ -27,6 +27,8 @@ pub unsafe extern "C" fn el0_sync(arg0: u64, arg1: u64, ctx: *const SyscallConte
 
     let ec = (esr >> 26) & 0x3F;
     if ec != EC_SVC64 {
+        kprintln!("EC_EL0: {:X}", ec);
+
         el0_handler();
     }
 

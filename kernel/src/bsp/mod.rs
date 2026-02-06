@@ -5,6 +5,8 @@ compile_error!("Features `qemu` and `hardware` are exclusive");
 compile_error!("One feature required [none selected]: `qemu` or `hardware`");
 
 pub mod rpi4b;
+
+#[cfg(feature = "qemu")]
 pub mod rpi4b_qemu;
 
 #[cfg(feature = "hardware")]

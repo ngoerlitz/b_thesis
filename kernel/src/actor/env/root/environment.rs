@@ -74,7 +74,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
         let allocator = self.allocator().clone();
 
         self.future_runtime.spawn(async move {
-            UserExecutor::<_, H>::new(
+            UserExecutor::<A, H>::new(
                 offset,
                 allocator,
                 Box::new(actor),

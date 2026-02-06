@@ -12,9 +12,9 @@ pub(crate) unsafe extern "C" fn _secbt(cpuid: u8) {
     // RootEnvironment::get().enter();
     //
     // kprintln!("Exited the root environment");
-    //
-    // loop {}
-    //
+
+    loop {}
+    
 
     // let mut uart = PL011::default();
     //
