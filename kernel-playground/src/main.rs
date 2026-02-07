@@ -56,21 +56,39 @@ impl Actor<RootEnvironment> for RootActor {
     ) -> Result<(), ActorCreateError> {
         let user_addr = unsafe {
             RootEnvironment::get()
-                .spawn_user(0, UserActor::default(), vec![])
+                .spawn_user(UserActor::default(), vec![])
                 .unwrap()
         };
 
         let user_addr2 = unsafe {
             RootEnvironment::get()
-                .spawn_user(1, UserSender::new(
+                .spawn_user(UserSender::new(
                     UserViewAddress::new(0, PhantomData)
                 ), vec![Box::new(user_addr.clone())])
+                .unwrap()
+        };
+
+        let user_addr3 = unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserActor::default(), vec![])
+                .unwrap()
+        };
+
+        let user_addr4 = unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(
+                    UserViewAddress::new(0, PhantomData)
+                ), vec![Box::new(user_addr3.clone())])
                 .unwrap()
         };
 
         ActorMessageSender::send(&user_addr, 25).await;
         ActorMessageSender::send(&user_addr, 50).await;
         ActorMessageSender::send(&user_addr, 75).await;
+
+        ActorMessageSender::send(&user_addr3, 25).await;
+        ActorMessageSender::send(&user_addr3, 50).await;
+        ActorMessageSender::send(&user_addr3, 75).await;
 
         let new_actor = ReceivingActor::default();
 

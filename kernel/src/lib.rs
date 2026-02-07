@@ -20,3 +20,4 @@ mod platform;
 mod services;
 pub mod user;
 pub mod utils;
+mod memory;

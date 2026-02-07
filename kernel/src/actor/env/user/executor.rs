@@ -4,7 +4,7 @@ use crate::actor::env::user::environment::UserEnvironment;
 use crate::actor::env::user::executor_event::{IrqExecutorType, IrqType, SystemCallExecutorType, UserExecutorEvent};
 use crate::actor::env::user::handler;
 use crate::actor::env::user::message_handler::UserMessageHandler;
-use crate::platform::aarch64::get_cpu_timer;
+use crate::platform::aarch64::{cpu, get_cpu_timer};
 use crate::{kprintln, linker_symbols, log_dbg};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -48,13 +48,6 @@ where
     A: Actor<UserEnvironment>,
     H: FutureRuntimeHandler,
 {
-    // TODO: !!!!! REMOVE THIS !!!!!!
-    // TODO: !!!!! REMOVE THIS !!!!!!
-    page_offset: usize,
-    // TODO: !!!!! REMOVE THIS !!!!!!
-    // TODO: !!!!! REMOVE THIS !!!!!!
-
-
     allocator: <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
     actor: Box<A>,
     receiver: ActorMessageChannelReceiver<A::Message>,
@@ -151,13 +144,10 @@ where
     {
         let mut event: Option<UserExecutorEvent> = None;
 
-        // Todo: User stack (this should be from a proper KernelMemoryManager)
-        let cpuid = cpuid() as usize;
-        let stack = STACK_EL0_TOP() - ((cpuid + self.page_offset) * 0x8000);
+        let r = RootEnvironment::get().user_stack_manager().lock().get_stack_addr().unwrap();
+        let stack = r.1;
 
         self.enable_deadline();
-
-        kprintln!("[HANDLE -- {}]: SP: {:#X}", self.page_offset, stack);
 
         func(&mut self.actor, &mut event, stack as u64);
 
@@ -168,17 +158,18 @@ where
                     kprintln!("{:?} args_hex: [{:#X}, {:#X}]", ctx, ctx.args[0], ctx.args[1]);
 
                     match ctx.svc_num {
-                         SvcType::PrintMsg => {
-                            unsafe {
-                                let slice = slice::from_raw_parts(ctx.args[0] as *const u8, ctx.args[1] as usize);
-                                match str::from_utf8(slice) {
-                                    Ok(s) => kprintln!("User: {}", s),
-                                    Err(_) => kprintln!("Invalid UTF-8 string"),
-                                }
+                        SvcType::PrintMsg => {
+                            let slice = unsafe {
+                                slice::from_raw_parts(ctx.args[0] as *const u8, ctx.args[1] as usize)
+                            };
 
-                                Self::continue_from_syscall(&mut event, &ctx.ctx);
+                            match str::from_utf8(slice) {
+                                Ok(s) => kprintln!("User: {}", s),
+                                Err(_) => kprintln!("Invalid UTF-8 string"),
                             }
-                         },
+
+                            Self::continue_from_syscall(&mut event, &ctx.ctx);
+                        },
                         SvcType::Test => {
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
@@ -195,7 +186,7 @@ where
                         },
                         SvcType::ReturnEl1 => {
                             break;
-                        }
+                        },
                         _ => unimplemented!()
                     }
                 }
@@ -229,6 +220,9 @@ where
                 }
             }
         }
+
+        cpu::disable_irq();
+        RootEnvironment::get().user_stack_manager().lock().free_stack(r.0);
     }
 
     #[inline(never)]

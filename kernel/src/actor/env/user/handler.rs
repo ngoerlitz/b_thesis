@@ -11,9 +11,7 @@ use crate::isr::SvcType;
 
 #[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    uprintln!("[USER_HANDLER 1/2] CREATE HANDLER!!! A: {:#X}", actor as u64);
-    svc_call!(SvcType::Test);
-    uprintln!("[USER_HANDLER 2/2] CREATE HANDLER!!! A: {:#X}", actor as u64);
+    // uprintln!("[USER_HANDLER] CREATE HANDLER!!! A: {:#X}", actor as u64);
 
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
@@ -50,7 +48,7 @@ pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
 
 #[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_destroy_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    uprintln!("[USER_HANDLER] DESTROY HANDLER!!! A: {:#X}", actor as u64);
+    // uprintln!("[USER_HANDLER] DESTROY HANDLER!!! A: {:#X}", actor as u64);
 
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 

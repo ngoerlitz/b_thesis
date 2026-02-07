@@ -32,9 +32,7 @@ impl Actor<UserEnvironment> for UserActor {
     ) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
 
         async move {
-            let mut counter = 0;
-
-            uprintln!("[I RECEIVED THE MESSAGE [{}]] -- {:?}", &counter, context.message);
+            uprintln!("[I RECEIVED THE MESSAGE] -- \"{:?}\"", context.message);
 
             Ok(())
         }
