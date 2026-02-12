@@ -10,6 +10,7 @@
 mod receiver;
 mod user;
 mod user_sender;
+mod root_actor_test;
 
 extern crate alloc;
 
@@ -29,6 +30,7 @@ use zcene_core::actor::{Actor, ActorCreateError, ActorDestroyError, ActorEnviron
 use zcene_core::future::r#yield;
 use kernel::actor::env::user::address::UserViewAddress;
 use kernel::actor::env::user::message_handler::UserMessageHandler;
+use crate::root_actor_test::RootActorTest;
 use crate::user_sender::UserSender;
 
 #[derive(Default)]
@@ -42,55 +44,59 @@ impl RootActor {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum RootActorMessage {
-    String(String),
-}
 
 impl Actor<RootEnvironment> for RootActor {
-    type Message = RootActorMessage;
+    type Message = ();
 
     async fn create<'a>(
         &'a mut self,
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
+        let ping_addr = unsafe {
+            RootEnvironment::get().spawn(RootActorTest::default()).unwrap()
+        };
+
+        for i in 0..50 {
+            ActorMessageSender::send(&ping_addr, i).await;
+        }
+
         let user_addr = unsafe {
             RootEnvironment::get()
                 .spawn_user(UserActor::default(), vec![])
                 .unwrap()
         };
-
-        let user_addr2 = unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(
-                    UserViewAddress::new(0, PhantomData)
-                ), vec![Box::new(user_addr.clone())])
-                .unwrap()
-        };
-
-        let user_addr3 = unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserActor::default(), vec![])
-                .unwrap()
-        };
-
-        let user_addr4 = unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(
-                    UserViewAddress::new(0, PhantomData)
-                ), vec![Box::new(user_addr3.clone())])
-                .unwrap()
-        };
-
-        ActorMessageSender::send(&user_addr, 25).await;
-        ActorMessageSender::send(&user_addr, 50).await;
-        ActorMessageSender::send(&user_addr, 75).await;
-
-        ActorMessageSender::send(&user_addr3, 25).await;
-        ActorMessageSender::send(&user_addr3, 50).await;
-        ActorMessageSender::send(&user_addr3, 75).await;
-
-        let new_actor = ReceivingActor::default();
+        //
+        // let user_addr2 = unsafe {
+        //     RootEnvironment::get()
+        //         .spawn_user(UserSender::new(
+        //             UserViewAddress::new(0, PhantomData)
+        //         ), vec![Box::new(user_addr.clone())])
+        //         .unwrap()
+        // };
+        //
+        // let user_addr3 = unsafe {
+        //     RootEnvironment::get()
+        //         .spawn_user(UserActor::default(), vec![])
+        //         .unwrap()
+        // };
+        //
+        // let user_addr4 = unsafe {
+        //     RootEnvironment::get()
+        //         .spawn_user(UserSender::new(
+        //             UserViewAddress::new(0, PhantomData)
+        //         ), vec![Box::new(user_addr3.clone())])
+        //         .unwrap()
+        // };
+        //
+        // ActorMessageSender::send(&user_addr, 25).await;
+        // ActorMessageSender::send(&user_addr, 50).await;
+        // ActorMessageSender::send(&user_addr, 75).await;
+        //
+        // ActorMessageSender::send(&user_addr3, 25).await;
+        // ActorMessageSender::send(&user_addr3, 50).await;
+        // ActorMessageSender::send(&user_addr3, 75).await;
+        //
+        // let new_actor = ReceivingActor::default();
 
         kprintln!("[ROOT] Sent message to `user_addr` channel");
         Ok(())

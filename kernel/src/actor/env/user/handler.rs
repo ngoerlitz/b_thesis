@@ -11,8 +11,6 @@ use crate::isr::SvcType;
 
 #[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
-    // uprintln!("[USER_HANDLER] CREATE HANDLER!!! A: {:#X}", actor as u64);
-
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());

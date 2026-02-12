@@ -28,7 +28,7 @@ where
     ) -> ActorBoxFuture<'static, Result<(), ActorSendError>, E> {
         let sender = self.clone();
 
-        let message = unsafe { message.cast::<A::Message>().as_ref().unwrap() }.clone();
+        let message: <A as Actor<E>>::Message = unsafe { message.cast::<A::Message>().as_ref().unwrap() }.clone();
 
         Box::pin_in(
             async move { <Self as ActorMessageSender<_>>::send(&sender, message).await },

@@ -19,7 +19,6 @@ impl Actor<UserEnvironment> for UserActor {
         &'a mut self,
         context: <UserEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> impl ActorFuture<'a, Result<(), ActorCreateError>> {
-
         async move {
             Ok(())
         }

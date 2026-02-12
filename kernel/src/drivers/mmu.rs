@@ -129,6 +129,60 @@ unsafe fn l2_table_for_l1_index(l1_index: usize) -> *mut PageTable {
     }
 }
 
+pub fn map_va_pa(va: u64, pa: u64) {
+    map_va_pa_with_attrs(
+        va,
+        pa,
+        ATTR_INDEX_NORMAL,
+        SH_INNER_SHAREABLE,
+        AP_EL1_RW_EL0_RW,
+        false,
+        false,
+    )
+}
+
+/// Same as [`map_va_pa`], but allows specifying descriptor attributes.
+pub fn map_va_pa_with_attrs(
+    va: u64,
+    pa: u64,
+    attr_index: u64,
+    sh: u64,
+    ap: u64,
+    pxn: bool,
+    uxn: bool,
+) {
+    unsafe {
+        debug_assert_eq!(va & (L2_BLOCK_SIZE - 1), 0, "VA not 2MiB-aligned");
+        debug_assert_eq!(pa & (L2_BLOCK_SIZE - 1), 0, "PA not 2MiB-aligned");
+        debug_assert!(va < VA_SPACE_SIZE, "VA out of range");
+
+        let block_idx = (va / L2_BLOCK_SIZE) as usize;
+        let l1_index = block_idx / 512;
+        let l2_index = block_idx % 512;
+
+        let l2_table = l2_table_for_l1_index(l1_index);
+        (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
+
+        tlb_invalidate_va_2mib(va);
+    }
+}
+
+#[inline(always)]
+unsafe fn tlb_invalidate_va_2mib(va: u64) {
+    // Ensure the updated descriptor is visible before invalidation.
+    asm!("dsb ishst", options(nostack, preserves_flags));
+
+    // TLBI VA operand --> VA[47:12]
+    let va_page = va >> 12;
+    asm!(
+        "tlbi vae1is, {0}",
+        in(reg) va_page,
+        options(nostack, preserves_flags),
+    );
+
+    asm!("dsb ish", "isb", options(nostack, preserves_flags));
+}
+
 /// Initialize the stage-1 translation tables for a 4 GB VA space.
 ///
 /// Must be called before enabling the MMU.
@@ -213,7 +267,7 @@ pub unsafe fn init_page_tables() {
                 AP_EL1_RW_EL0_RW,
                 false,
                 false,
-            ) // your default
+            )
         };
 
         let l1_index = block_idx / 512; // 512 × 2 MiB = 1 GiB per L2 table

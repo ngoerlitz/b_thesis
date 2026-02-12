@@ -8,13 +8,14 @@ use crate::kprintln;
 
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn _secbt(cpuid: u8) {
-    unsafe {
-        mmu::enable_mmu_el1();
+    #[cfg(not(feature = "single_core"))]
+    {
+        unsafe {
+            mmu::enable_mmu_el1();
+        }
+
+        RootEnvironment::get().enter();
     }
-    
-    RootEnvironment::get().enter();
-    //
-    // kprintln!("Exited the root environment");
 
     loop {}
     
