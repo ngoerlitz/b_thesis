@@ -14,7 +14,7 @@ use crate::hal::irq_driver::{CpuTarget, IrqType};
 use crate::hal::serial::SerialDriver;
 use crate::hal::timer::SystemTimerDriver;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::{bsp, drivers, kprintln, linker_symbols, log_dbg, user};
+use crate::{bsp, drivers, kprintln, linker_symbols, log_dbg, test, user};
 use alloc::sync::Arc;
 use core::arch::asm;
 use core::fmt::{Debug, Display, Formatter};
@@ -57,6 +57,9 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
             .unwrap()
             .write(x.into());
     }
+
+    #[cfg(feature = "test")]
+    test::test_all();
 
     // Bring up the other cores
     unsafe {

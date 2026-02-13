@@ -7,12 +7,13 @@ GDB=0
 LOG_DEBUG=0
 LOG_CORES=0
 SINGLE_CORE=0
+TEST=0
 EXTRA_QEMU_ARGS=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [--log-cores] [--single-core] [-- <extra qemu args>]
+  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [--log-cores] [--single-core] [--test] [-- <extra qemu args>]
 
 Modes:
   qemu       Build QEMU feature set, create kernel8.img, run QEMU
@@ -24,6 +25,7 @@ Options:
   --log-debug  Enable cargo feature flag 'log_debug'
   --log-cores  Enable cargo feature flag 'log_cores'
   --single-core Enable single core execution only
+  --test        Enables additional code only compiled when testing
   -h, --help   Show this help
 
 Notes:
@@ -52,6 +54,8 @@ while [[ $# -gt 0 ]]; do
       LOG_CORES=1; shift ;;
     --single-core)
       SINGLE_CORE=1; shift ;;
+    --test)
+      TEST=1; shift ;;
     --help|-h)
       usage; exit 0 ;;
     --)
@@ -96,6 +100,10 @@ build_and_objcopy() {
 
   if [[ $SINGLE_CORE -eq 1 ]]; then
     features+=",single_core"
+  fi
+  
+  if [[ $TEST -eq 1 ]]; then
+    features+=",test"
   fi
 
   cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features"

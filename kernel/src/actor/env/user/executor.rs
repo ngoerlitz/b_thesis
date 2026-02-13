@@ -19,6 +19,8 @@ use kernel_derive::Constructor;
 use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelAddress, ActorMessageChannelReceiver, ActorMessageChannelSender};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use zcene_core::future::r#yield;
+use crate::actor::channel::pt_channel_receiver::PtActorMessageChannelReceiver;
+use crate::actor::channel::pt_message::PtMessage;
 use crate::drivers::gic400::GIC400;
 use crate::hal::driver::Driver;
 use crate::isr::context::ISRContext;
@@ -50,7 +52,7 @@ where
 {
     allocator: <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
     actor: Box<A>,
-    receiver: ActorMessageChannelReceiver<A::Message>,
+    receiver: PtActorMessageChannelReceiver<A::Message, H>,
     deadline_in_ms: Option<NonZeroU64>,
     message_handlers: Vec<
         Box<
@@ -89,8 +91,20 @@ where
 
         kprintln!("USER: AFTER HANDLE");
         while let Some(message) = self.receiver.receive().await {
-            let b = Box::new(message);
-            let ptr: u64 = Box::into_raw(b) as *const _ as u64;
+            kprintln!("USER GOT MESSAGE: {:?}", &message);
+
+            let mut ptr: u64 = 0;
+
+            match &message {
+                PtMessage::Copy(b) => {
+                    ptr = &**b as *const _ as u64;
+                },
+                PtMessage::Page(v) => {
+                    todo!()
+                }
+            }
+
+            debug_assert_ne!(ptr, 0);
 
             self.handle(move |actor, event, stack| {
                 Self::execute_msg(
@@ -102,10 +116,6 @@ where
                 )
             })
                 .await;
-
-            unsafe {
-                let _ = Box::from_raw(ptr as *mut A::Message);
-            }
         }
 
 

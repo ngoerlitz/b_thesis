@@ -25,9 +25,12 @@ use core::marker::PhantomData;
 use kernel::actor::env::root::environment::RootEnvironment;
 use kernel::actor::env::user::environment::UserEnvironment;
 use kernel::boot::global::ACTOR_ROOT_ENVIRONMENT;
-use kernel::{bootstrap_system, kprintln};
-use zcene_core::actor::{Actor, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageChannelSender, ActorMessageSender};
+use kernel::{bootstrap_system, kprintln, test};
+use zcene_core::actor::{Actor, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageChannelSender, ActorMessageSender};
 use zcene_core::future::r#yield;
+use kernel::actor::channel::pt_channel_sender::PtActorMessageChannelSender;
+use kernel::actor::channel::pt_message::PtMessage::{Copy, Page};
+use kernel::actor::env::root::service::message_frame_allocator_service::MessageFrameAllocatorService;
 use kernel::actor::env::user::address::UserViewAddress;
 use kernel::actor::env::user::message_handler::UserMessageHandler;
 use crate::root_actor_test::RootActorTest;
@@ -56,23 +59,31 @@ impl Actor<RootEnvironment> for RootActor {
             RootEnvironment::get().spawn(RootActorTest::default()).unwrap()
         };
 
-        for i in 0..50 {
-            ActorMessageSender::send(&ping_addr, i).await;
-        }
+        ping_addr.send_msg(Copy(Box::new(25))).await;
 
-        let user_addr = unsafe {
+
+        let user_addr2 = unsafe {
             RootEnvironment::get()
-                .spawn_user(UserActor::default(), vec![])
+                .spawn_user(UserActor::new(10), vec![])
                 .unwrap()
         };
-        //
-        // let user_addr2 = unsafe {
-        //     RootEnvironment::get()
-        //         .spawn_user(UserSender::new(
-        //             UserViewAddress::new(0, PhantomData)
-        //         ), vec![Box::new(user_addr.clone())])
-        //         .unwrap()
-        // };
+
+        let user_addr1 = unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserActor::new(20), vec![])
+                .unwrap()
+        };
+
+        user_addr2.send(77u64).await;
+        user_addr2.send(90u64).await;
+        user_addr2.send(140u64).await;
+        user_addr2.send(832u64).await;
+
+        user_addr1.send(77u64).await;
+        user_addr1.send(90u64).await;
+        user_addr1.send(140u64).await;
+        user_addr1.send(832u64).await;
+
         //
         // let user_addr3 = unsafe {
         //     RootEnvironment::get()

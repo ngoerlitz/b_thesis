@@ -5,24 +5,20 @@ use kernel::actor::env::user::environment::UserEnvironment;
 use zcene_core::actor::{Actor, ActorCreateError, ActorEnvironment, ActorFuture, ActorHandleError, ActorMessageSender};
 use kernel::{kprintln, uprintln};
 
-#[derive(Default)]
 pub struct UserActor {
+    id: usize,
 }
 
-pub type UserActorMessage = u64;
-
-impl Actor<UserEnvironment> for UserActor {
-    type Message = UserActorMessage;
-
-    #[unsafe(link_section = ".user_text")]
-    fn create<'a>(
-        &'a mut self,
-        context: <UserEnvironment as ActorEnvironment>::CreateContext<'a>,
-    ) -> impl ActorFuture<'a, Result<(), ActorCreateError>> {
-        async move {
-            Ok(())
+impl UserActor {
+    pub fn new(id: usize) -> UserActor {
+        Self {
+            id
         }
     }
+}
+
+impl Actor<UserEnvironment> for UserActor {
+    type Message = u64;
 
     #[unsafe(link_section = ".user_text")]
     fn handle<'a>(
@@ -30,8 +26,10 @@ impl Actor<UserEnvironment> for UserActor {
         context: <UserEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>,
     ) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
 
+        uprintln!("[I RECEIVED THE MESSAGE -- {}] -- \"{:?}\"", self.id, context.message);
+        
+
         async move {
-            uprintln!("[I RECEIVED THE MESSAGE] -- \"{:?}\"", context.message);
 
             Ok(())
         }

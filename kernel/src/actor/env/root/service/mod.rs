@@ -1,2 +1,2 @@
 pub mod actor_root_logger_service;
-mod message_frame_allocator_service;
+pub mod message_frame_allocator_service;

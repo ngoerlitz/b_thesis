@@ -9,7 +9,7 @@ use crate::actor::runtime::handler::RuntimeHandler;
 use crate::boot::global;
 use crate::drivers::gic400::GIC400;
 use crate::drivers::pl011::PL011;
-use crate::{getter, linker_symbols};
+use crate::{getter, kprintln, linker_symbols};
 use crate::hal::serial::SerialDriver;
 use crate::services::irq_manager::IrqManagerService;
 use alloc::alloc::Global;
@@ -24,6 +24,9 @@ use core::num::{NonZero, NonZeroU64, NonZeroUsize};
 use spin::{Mutex, RwLock};
 use zcene_core::actor::{Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference, ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress, ActorMessageChannelSender, ActorSpawnError};
 use zcene_core::future::runtime::{FutureRuntimeHandler, FutureRuntimeReference};
+use crate::actor::channel::pt_channel_address::PtActorMessageChannelAddress;
+use crate::actor::channel::pt_message::PtMessage::{Copy, Page};
+use crate::actor::channel::pt_message_channel::PtActorMessageChannel;
 use crate::actor::env::user::message_handler::UserMessageHandler;
 use crate::memory::bitmap_stack_allocator::StackAllocator;
 
@@ -76,14 +79,15 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
             >,
             <RootEnvironment<H> as ActorEnvironmentAllocator>::Allocator,
         >,
-    ) -> Result<ActorMessageChannelAddress<A, UserEnvironment>, ActorSpawnError>
+    ) -> Result<PtActorMessageChannelAddress<A, UserEnvironment, H>, ActorSpawnError>
     {
-        let (sender, receiver) = ActorMessageChannel::<A::Message>::new_unbounded();
         let allocator = self.allocator().clone();
+        let (sender, receiver) = PtActorMessageChannel::<A::Message, H>::new_bounded(allocator.clone(), 50);
 
+        let executor_allocator = allocator.clone();
         self.future_runtime.spawn(async move {
             UserExecutor::<A, H>::new(
-                allocator,
+                executor_allocator,
                 Box::new(actor),
                 receiver,
                 NonZeroU64::new(100),
@@ -95,15 +99,17 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
         });
 
         Ok(
-            ActorMessageChannelAddress::new(
+            PtActorMessageChannelAddress::new(
                 sender,
+                allocator,
+                PhantomData
             )
         )
     }
 }
 
 impl<H: FutureRuntimeHandler> ActorEnvironment for RootEnvironment<H> {
-    type Address<A: Actor<Self>> = ActorMessageChannelAddress<A, Self>;
+    type Address<A: Actor<Self>> = PtActorMessageChannelAddress<A, Self, H>;
     type CreateContext<'a> = RootEnvironmentCreateCtx<'a, H>;
     type HandleContext<'a, M: ActorMessage> = RootEnvironmentHandleCtx<'a, H, M>;
     type DestroyContext<'a> = RootEnvironmentDestroyCtx<'a, H>;
@@ -122,7 +128,8 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
         self: &ActorEnvironmentReference<Self>,
         mut actor: A,
     ) -> Result<<Self as ActorEnvironment>::Address<A>, ActorSpawnError> {
-        let (sender, receiver) = ActorMessageChannel::<A::Message>::new_unbounded();
+        let alloc = self.allocator().clone();
+        let (sender, receiver) = PtActorMessageChannel::<A::Message, H>::new_bounded(alloc.clone(), 50);
 
         self.future_runtime.spawn({
             let environment = self.clone();
@@ -131,9 +138,16 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
                 actor.create(Self::CreateContext::new(&*environment)).await;
 
                 while let Some(message) = receiver.receive().await {
-                    actor
-                        .handle(Self::HandleContext::new(&*environment, message))
-                        .await;
+                    // kprintln!("Received message: {:?}", &message);
+
+                    match message {
+                        Copy(msg_box) => {
+                            actor.handle(Self::HandleContext::new(&*environment, *msg_box)).await;
+                        },
+                        Page(page_id) => {
+                            todo!()
+                        }
+                    }
                 }
 
                 actor
@@ -144,6 +158,8 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
 
         Ok(<RootEnvironment<H> as ActorEnvironment>::Address::<A>::new(
             sender,
+            alloc,
+            PhantomData
         ))
     }
 }
