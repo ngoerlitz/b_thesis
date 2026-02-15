@@ -13,7 +13,7 @@ extern crate alloc;
 pub mod actor;
 pub mod boot;
 mod bsp;
-mod drivers;
+pub mod drivers;
 mod hal;
 pub mod isr;
 mod platform;

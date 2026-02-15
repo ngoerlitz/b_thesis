@@ -1,5 +1,6 @@
 use zcene_core::actor::{Actor, ActorCreateError, ActorEnvironment, ActorMessageSender};
-use kernel::actor::env::user::address::UserViewAddress;
+use kernel::actor::channel::OUTBOX_VA_ADDR;
+use kernel::actor::env::user::address::{MsgOf, UserViewAddress};
 use kernel::actor::env::user::environment::UserEnvironment;
 use kernel::uprintln;
 use crate::user::{UserActor};
@@ -22,8 +23,13 @@ impl Actor<UserEnvironment> for UserSender {
     ) -> Result<(), ActorCreateError> {
         uprintln!("[1] CREATING UserSender");
 
-        // self.target.send(*b"HelloWorld\0\0\0\0\0").await;
-        self.target.send(512).await;
+        // self.target.send(512).await;
+
+        unsafe {
+            *(OUTBOX_VA_ADDR as *mut MsgOf<UserActor>) = 282133;
+        }
+
+        self.target.send_page().await;
 
         Ok(())
     }

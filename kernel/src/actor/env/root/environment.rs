@@ -24,10 +24,13 @@ use core::num::{NonZero, NonZeroU64, NonZeroUsize};
 use spin::{Mutex, RwLock};
 use zcene_core::actor::{Actor, ActorEnterError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentReference, ActorEnvironmentSpawn, ActorMessage, ActorMessageChannel, ActorMessageChannelAddress, ActorMessageChannelSender, ActorSpawnError};
 use zcene_core::future::runtime::{FutureRuntimeHandler, FutureRuntimeReference};
+use crate::actor::channel::INBOX_VA_ADDR;
 use crate::actor::channel::pt_channel_address::PtActorMessageChannelAddress;
 use crate::actor::channel::pt_message::PtMessage::{Copy, Page};
 use crate::actor::channel::pt_message_channel::PtActorMessageChannel;
+use crate::actor::env::root::service::message_frame_allocator_service::MessageFrameAllocatorService;
 use crate::actor::env::user::message_handler::UserMessageHandler;
+use crate::drivers::mmu;
 use crate::memory::bitmap_stack_allocator::StackAllocator;
 
 linker_symbols! {
@@ -43,6 +46,7 @@ where
     logger: ActorRootLoggerService<PL011>,
     irq_manager: RwLock<IrqManagerService<GIC400, 216>>,
     user_stack_manager: Mutex<StackAllocator>,
+    message_frame_allocator: Mutex<MessageFrameAllocatorService>,
 }
 
 impl<H: FutureRuntimeHandler> RootEnvironment<H> {
@@ -54,7 +58,8 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
             future_runtime,
             logger,
             irq_manager: RwLock::new(IrqManagerService::new(GIC400::new())),
-            user_stack_manager: Mutex::new(StackAllocator::new(STACK_EL0_TOP(), USER_STACK_SIZE))
+            user_stack_manager: Mutex::new(StackAllocator::new(STACK_EL0_TOP(), USER_STACK_SIZE)),
+            message_frame_allocator: Mutex::new(MessageFrameAllocatorService::new(0x40200000))
         }
     }
 
@@ -62,6 +67,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
     getter!(logger: ActorRootLoggerService<PL011>);
     getter!(irq_manager: RwLock<IrqManagerService<GIC400, 216>>);
     getter!(user_stack_manager: Mutex<StackAllocator>);
+    getter!(message_frame_allocator: Mutex<MessageFrameAllocatorService>);
 
     pub fn enter(&self) -> Result<(), ActorEnterError> {
         self.future_runtime.run();
@@ -142,10 +148,20 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
 
                     match message {
                         Copy(msg_box) => {
-                            actor.handle(Self::HandleContext::new(&*environment, *msg_box)).await;
+                            actor.handle(Self::HandleContext::new(&*environment, &*msg_box)).await;
                         },
-                        Page(page_id) => {
-                            todo!()
+                        Page(id, pa) => {
+                            mmu::map_va_pa(INBOX_VA_ADDR, pa as u64);
+
+                            kprintln!("Reading message...");
+
+                            let msg = unsafe {
+                                &*(INBOX_VA_ADDR as *const A::Message)
+                            };
+
+                            actor.handle(Self::HandleContext::new(&*environment, msg)).await;
+
+                            environment.message_frame_allocator().lock().free_frame(id);
                         }
                     }
                 }

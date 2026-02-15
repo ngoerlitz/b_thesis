@@ -151,6 +151,8 @@ pub fn map_va_pa_with_attrs(
     pxn: bool,
     uxn: bool,
 ) {
+    kprintln!("Mapping (VA) {:#X} to (PA) {:#X}", va, pa);
+    
     unsafe {
         debug_assert_eq!(va & (L2_BLOCK_SIZE - 1), 0, "VA not 2MiB-aligned");
         debug_assert_eq!(pa & (L2_BLOCK_SIZE - 1), 0, "PA not 2MiB-aligned");

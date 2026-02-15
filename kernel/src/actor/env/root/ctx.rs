@@ -11,7 +11,7 @@ pub struct RootEnvironmentCreateCtx<'a, H: FutureRuntimeHandler> {
 #[derive(Constructor)]
 pub struct RootEnvironmentHandleCtx<'a, H: FutureRuntimeHandler, M: ActorMessage> {
     pub environment: &'a RootEnvironment<H>,
-    pub message: M,
+    pub message: &'a M,
 }
 
 #[derive(Constructor)]

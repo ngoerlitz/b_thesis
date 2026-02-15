@@ -13,6 +13,7 @@ pub enum SvcType {
     SendMsg = 0x3,
     ReturnEl1 = 0x4,
     Test = 0x5,
+    SendPt = 0x6,
 }
 
 impl From<u16> for SvcType {
@@ -22,6 +23,7 @@ impl From<u16> for SvcType {
             0x3 => SvcType::SendMsg,
             0x4 => SvcType::ReturnEl1,
             0x5 => SvcType::Test,
+            0x6 => SvcType::SendPt,
             _ => unimplemented!(),
         }
     }

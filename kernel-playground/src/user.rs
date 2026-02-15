@@ -4,6 +4,7 @@ use kernel::actor::env::root::environment::RootEnvironment;
 use kernel::actor::env::user::environment::UserEnvironment;
 use zcene_core::actor::{Actor, ActorCreateError, ActorEnvironment, ActorFuture, ActorHandleError, ActorMessageSender};
 use kernel::{kprintln, uprintln};
+use kernel::actor::channel::OUTBOX_VA_ADDR;
 
 pub struct UserActor {
     id: usize,
@@ -27,7 +28,6 @@ impl Actor<UserEnvironment> for UserActor {
     ) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
 
         uprintln!("[I RECEIVED THE MESSAGE -- {}] -- \"{:?}\"", self.id, context.message);
-        
 
         async move {
 

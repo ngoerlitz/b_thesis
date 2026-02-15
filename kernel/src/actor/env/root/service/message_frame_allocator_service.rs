@@ -19,7 +19,7 @@ pub struct MessageFrameAllocatorService {
 }
 
 impl MessageFrameAllocatorService {
-    pub const FRAME_SIZE: usize = 0x20_000; // 2MiB
+    pub const FRAME_SIZE: usize = 0x200_000; // 2MiB
     pub const NUM_FRAMES: usize = 1000;
     const BITMAP_WORDS: usize = (Self::NUM_FRAMES + 63) / 64;
 

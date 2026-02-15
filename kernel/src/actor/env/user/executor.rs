@@ -19,9 +19,11 @@ use kernel_derive::Constructor;
 use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelAddress, ActorMessageChannelReceiver, ActorMessageChannelSender};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use zcene_core::future::r#yield;
+use crate::actor::channel::{INBOX_VA_ADDR, OUTBOX_VA_ADDR};
 use crate::actor::channel::pt_channel_receiver::PtActorMessageChannelReceiver;
 use crate::actor::channel::pt_message::PtMessage;
 use crate::drivers::gic400::GIC400;
+use crate::drivers::mmu;
 use crate::hal::driver::Driver;
 use crate::isr::context::ISRContext;
 use crate::isr::irq_ctx::El0IrqContext;
@@ -99,8 +101,9 @@ where
                 PtMessage::Copy(b) => {
                     ptr = &**b as *const _ as u64;
                 },
-                PtMessage::Page(v) => {
-                    todo!()
+                PtMessage::Page(page_id, pa) => {
+                    mmu::map_va_pa(INBOX_VA_ADDR, *pa as u64);
+                    ptr = INBOX_VA_ADDR;
                 }
             }
 
@@ -116,6 +119,14 @@ where
                 )
             })
                 .await;
+
+            // Free page after it has been read!
+            match message {
+                PtMessage::Page(id, _) => {
+                    RootEnvironment::get().message_frame_allocator().lock().free_frame(id);
+                },
+                _ => {}
+            }
         }
 
 
@@ -151,6 +162,10 @@ where
         }
     }
 
+    fn setup_memory_mappings(&self, addr: usize) {
+        mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
+    }
+
     async fn handle<F>(&mut self, func: F)
     where
         F: FnOnce(&mut Box<A>, &mut Option<UserExecutorEvent>, u64),
@@ -160,7 +175,10 @@ where
         let r = RootEnvironment::get().user_stack_manager().lock().get_stack_addr().unwrap();
         let stack = r.1;
 
+        let (page_id, addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
+
         self.enable_deadline();
+        self.setup_memory_mappings(addr);
 
         func(&mut self.actor, &mut event, stack as u64);
 
@@ -187,6 +205,9 @@ where
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
                         SvcType::SendMsg => {
+                            // arg0 = target_actor_id
+                            // arg1 = msg_ptr
+
                             match self.message_handlers.get(ctx.args[0] as usize) {
                                 Some(handler) => {
                                     kprintln!("MSG_PTR: {:X}", ctx.args[1] as u64);
@@ -195,6 +216,22 @@ where
                                 None => todo!()
                             }
 
+                            Self::continue_from_syscall(&mut event, &ctx.ctx);
+                        },
+                        SvcType::SendPt => {
+                            // arg0 = target_actor_id
+
+                            match self.message_handlers.get(ctx.args[0] as usize) {
+                                Some(handler) => {
+                                    kprintln!("Sending PAGE!! {:X} @ {:#X}", page_id, addr);
+                                    let _result = handler.send_page(&Global, page_id, addr).await;
+                                },
+                                None => todo!()
+                            }
+
+                            // TODO: After sending a message, we need to create a **NEW** OUTBOX_VA_ADDR
+                            // TODO: such that more messages can be sent. Currently, the old addr will
+                            // TODO: be overwritten. 
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
                         SvcType::ReturnEl1 => {

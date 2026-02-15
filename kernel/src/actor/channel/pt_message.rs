@@ -5,7 +5,7 @@ use zcene_core::actor::{ActorMessage};
 
 pub enum PtMessage<M: ActorMessage, H: FutureRuntimeHandler> {
     Copy(Box<M, H::Allocator>),
-    Page(usize)
+    Page(usize, usize)
 }
 
 impl<M, H> Debug for PtMessage<M, H>
@@ -21,7 +21,7 @@ where
                     .field(&format_args!("{:p}", ptr))
                     .finish()
             }
-            PtMessage::Page(v) => f.debug_tuple("Page").field(v).finish(),
+            PtMessage::Page(id, addr) => f.debug_tuple("Page").field(id).field(addr).finish(),
         }
     }
 }
@@ -35,7 +35,7 @@ where
     fn clone(&self) -> Self {
         match self {
             PtMessage::Copy(b) => PtMessage::Copy(Box::clone(b)),
-            PtMessage::Page(n) => PtMessage::Page(*n),
+            PtMessage::Page(page_id, pa) => PtMessage::Page(*page_id, *pa),
         }
     }
 }

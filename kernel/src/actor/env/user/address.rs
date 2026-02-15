@@ -1,12 +1,16 @@
 use alloc::boxed::Box;
 use crate::actor::env::user::environment::UserEnvironment;
 use crate::isr::SvcType;
-use crate::{kprintln, uprintln};
+use crate::{kprintln, svc_call, uprintln};
 use crate::platform::aarch64::cpu::current_el;
 use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
 use kernel_derive::Constructor;
 use zcene_core::actor::{Actor, ActorAddress, ActorFuture, ActorMessageSender, ActorSendError};
+use zcene_core::future::runtime::FutureRuntimeHandler;
+use crate::actor::channel::pt_message::PtMessage;
+
+pub type MsgOf<A> = <A as Actor<UserEnvironment>>::Message;
 
 #[derive(Constructor)]
 pub struct UserViewAddress<A: Actor<UserEnvironment>> {
@@ -35,6 +39,26 @@ impl<A: Actor<UserEnvironment>> ActorMessageSender<A::Message> for UserViewAddre
                     svc = const SvcType::SendMsg as u16,
                     in("x0") self.target_actor_id,        // target actor ID
                     in("x1") msg_ptr,
+                    options(nostack),
+                    clobber_abi("C")
+                );
+            }
+
+            Ok(())
+        }
+    }
+}
+
+impl<A: Actor<UserEnvironment>> UserViewAddress<A> {
+    pub fn send_page(&self) -> impl ActorFuture<'_, Result<(), ActorSendError>> {
+        uprintln!("UserAddress::send_page");
+
+        async move {
+            unsafe {
+                core::arch::asm!(
+                    "svc #{svc}",
+                    svc = const SvcType::SendPt as u16,
+                    in("x0") self.target_actor_id,        // target actor ID
                     options(nostack),
                     clobber_abi("C")
                 );
