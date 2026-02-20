@@ -175,7 +175,7 @@ where
         let r = RootEnvironment::get().user_stack_manager().lock().get_stack_addr().unwrap();
         let stack = r.1;
 
-        let (page_id, addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
+        let (mut page_id, mut addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
 
         self.enable_deadline();
         self.setup_memory_mappings(addr);
@@ -229,9 +229,9 @@ where
                                 None => todo!()
                             }
 
-                            // TODO: After sending a message, we need to create a **NEW** OUTBOX_VA_ADDR
-                            // TODO: such that more messages can be sent. Currently, the old addr will
-                            // TODO: be overwritten. 
+                            (page_id, addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
+                            self.setup_memory_mappings(addr);
+
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
                         SvcType::ReturnEl1 => {
@@ -270,6 +270,8 @@ where
                 }
             }
         }
+
+        RootEnvironment::get().message_frame_allocator().lock().free_frame(page_id);
 
         cpu::disable_irq();
         RootEnvironment::get().user_stack_manager().lock().free_stack(r.0);

@@ -31,6 +31,12 @@ impl Actor<UserEnvironment> for UserSender {
 
         self.target.send_page().await;
 
+        unsafe {
+            *(OUTBOX_VA_ADDR as *mut MsgOf<UserActor>) = 999999;
+        }
+
+        self.target.send_page().await;
+
         Ok(())
     }
 }
