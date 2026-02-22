@@ -5,6 +5,9 @@ use crate::hal::driver::Driver;
 use crate::{kprintln, linker_symbols};
 use core::arch::asm;
 use core::fmt::Write;
+use crate::platform::aarch64::cpu;
+
+const NUM_CORES: usize = 4;
 
 /// 4 KiB translation granule.
 pub const PAGE_SIZE: u64 = 4096;
@@ -65,13 +68,11 @@ const DESC_UXN: u64 = 1 << 54; // Unprivileged Execute Never
 
 /// A single page table (L1 or L2): 512 entries of 8 bytes = 4 KiB.
 #[repr(align(4096))]
+#[derive(Copy, Clone)]
 pub struct PageTable([u64; 512]);
 
-static mut L1_TABLE: PageTable = PageTable([0; 512]);
-static mut L2_TABLE0: PageTable = PageTable([0; 512]); // VA [0 .. 1 GiB)
-static mut L2_TABLE1: PageTable = PageTable([0; 512]); // VA [1 .. 2 GiB)
-static mut L2_TABLE2: PageTable = PageTable([0; 512]); // VA [2 .. 3 GiB)
-static mut L2_TABLE3: PageTable = PageTable([0; 512]); // VA [3 .. 4 GiB)
+static mut L1_TABLES: [PageTable; NUM_CORES] = [PageTable([0; 512]); NUM_CORES];
+static mut L2_TABLES: [[PageTable; 4]; NUM_CORES] = [[PageTable([0; 512]); 4]; NUM_CORES]; // PageTable([0; 512]) * NUM_CORES
 
 /// Create a table descriptor that points to the next-level table.
 fn make_table_desc(next_level_table_pa: u64) -> u64 {
@@ -120,39 +121,33 @@ fn make_l2_block_desc(pa: u64, attr_index: u64, sh: u64, ap: u64, pxn: bool, uxn
 
 /// Return a mutable reference to the L2 table corresponding to an L1 index.
 unsafe fn l2_table_for_l1_index(l1_index: usize) -> *mut PageTable {
-    match l1_index {
-        0 => &raw mut L2_TABLE0,
-        1 => &raw mut L2_TABLE1,
-        2 => &raw mut L2_TABLE2,
-        3 => &raw mut L2_TABLE3,
-        _ => core::hint::unreachable_unchecked(),
-    }
+    let cpuid = cpu::cpuid() as usize;
+    &raw mut L2_TABLES[cpuid][l1_index]
+}
+
+unsafe fn l2_table_for_l1_index_cpuid(l1_index: usize, cpuid: usize) -> *mut PageTable {
+    &raw mut L2_TABLES[cpuid][l1_index]
 }
 
 pub fn map_va_pa(va: u64, pa: u64) {
-    map_va_pa_with_attrs(
-        va,
-        pa,
-        ATTR_INDEX_NORMAL,
-        SH_INNER_SHAREABLE,
-        AP_EL1_RW_EL0_RW,
-        false,
-        false,
-    )
+    let cpuid = cpu::cpuid() as usize;
+
+    map_va_pa_with_attrs_for_core(cpuid, va, pa, ATTR_INDEX_NORMAL, SH_INNER_SHAREABLE, AP_EL1_RW_EL0_RW, false, false);
 }
 
 /// Same as [`map_va_pa`], but allows specifying descriptor attributes.
-pub fn map_va_pa_with_attrs(
+pub fn map_va_pa_with_attrs_for_core(
+    cpuid: usize,
     va: u64,
     pa: u64,
     attr_index: u64,
     sh: u64,
     ap: u64,
     pxn: bool,
-    uxn: bool,
+    uxn: bool
 ) {
-    kprintln!("Mapping (VA) {:#X} to (PA) {:#X}", va, pa);
-    
+    kprintln!("Core {}: Mapping (VA) {:#X} to (PA) {:#X}", cpuid, va, pa);
+
     unsafe {
         debug_assert_eq!(va & (L2_BLOCK_SIZE - 1), 0, "VA not 2MiB-aligned");
         debug_assert_eq!(pa & (L2_BLOCK_SIZE - 1), 0, "PA not 2MiB-aligned");
@@ -162,7 +157,7 @@ pub fn map_va_pa_with_attrs(
         let l1_index = block_idx / 512;
         let l2_index = block_idx % 512;
 
-        let l2_table = l2_table_for_l1_index(l1_index);
+        let l2_table = l2_table_for_l1_index_cpuid(l1_index, cpuid);
         (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
 
         tlb_invalidate_va_2mib(va);
@@ -189,95 +184,97 @@ unsafe fn tlb_invalidate_va_2mib(va: u64) {
 ///
 /// Must be called before enabling the MMU.
 pub unsafe fn init_page_tables() {
+    let cpuid = cpu::cpuid() as usize;
+
     // 1 GiB chunks → 4 L1 entries.
     for l1_index in 0..4usize {
-        let l2 = l2_table_for_l1_index(l1_index) as *mut PageTable as u64;
-        L1_TABLE.0[l1_index] = make_table_desc(l2);
+        let l2 = l2_table_for_l1_index_cpuid(l1_index, cpuid) as u64;
+        L1_TABLES[cpuid].0[l1_index] = make_table_desc(l2);
     }
 
     // Fill L2 blocks for the whole 4 GiB range.
     for block_idx in 0..NUM_L2_BLOCKS {
         let va = (block_idx as u64) * L2_BLOCK_SIZE;
 
-        // Skip unmapped [940 MiB .. 1 GiB)
+        // Skip unmapped [940 MiB ... 1 GiB)
         if va >= UNMAPPED_START && va < UNMAPPED_END {
             continue;
         }
 
         let is_mmio = va >= MMIO_START && va < MMIO_END;
 
-        // Identity mapping VA → PA.
-        let pa = va;
+            // Identity mapping VA → PA, apply kernel and other region attributes.
+            let pa = va;
+            let ktext_start = KERNEL_TEXT_START();
+            let ktext_end = KERNEL_TEXT_END();
+            let krodata_start = KERNEL_RODATA_START();
+            let krodata_end = KERNEL_RODATA_END();
+            let kdata_start = KERNEL_DATA_START();
+            let kdata_end = KERNEL_DATA_END();
 
-        let ktext_start = KERNEL_TEXT_START();
-        let ktext_end = KERNEL_TEXT_END();
-        let krodata_start = KERNEL_RODATA_START();
-        let krodata_end = KERNEL_RODATA_END();
-        let kdata_start = KERNEL_DATA_START();
-        let kdata_end = KERNEL_DATA_END();
+            let vau = va as usize;
+            let is_ktext = vau >= ktext_start && vau < ktext_end;
+            let is_krodata = vau >= krodata_start && vau < krodata_end;
+            let is_kdata = vau >= kdata_start && vau < kdata_end;
+            let is_boot0 = vau < 0x200000;
 
-        let vau = va as usize;
-        let is_ktext = vau >= ktext_start && vau < ktext_end;
-        let is_krodata = vau >= krodata_start && vau < krodata_end;
-        let is_kdata = vau >= kdata_start && vau < kdata_end;
-        let is_boot0 = vau < 0x200000;
+            let (attr_index, sh, ap, pxn, uxn) = if is_mmio {
+                (
+                    ATTR_INDEX_DEVICE,
+                    SH_OUTER_SHAREABLE,
+                    AP_EL1_RW_EL0_NO,
+                    true,
+                    true,
+                )
+            } else if is_ktext {
+                (
+                    ATTR_INDEX_NORMAL,
+                    SH_INNER_SHAREABLE,
+                    AP_EL1_RO_EL0_RO,
+                    false,
+                    false,
+                ) // ROX shared
+            } else if is_krodata {
+                (
+                    ATTR_INDEX_NORMAL,
+                    SH_INNER_SHAREABLE,
+                    AP_EL1_RO_EL0_RO,
+                    true,
+                    true,
+                ) // RO, XN
+            } else if is_kdata {
+                (
+                    ATTR_INDEX_NORMAL,
+                    SH_INNER_SHAREABLE,
+                    AP_EL1_RW_EL0_RW,
+                    true,
+                    true,
+                ) // EL1 RW, XN
+            } else if is_boot0 {
+                (
+                    ATTR_INDEX_NORMAL,
+                    SH_INNER_SHAREABLE,
+                    AP_EL1_RW_EL0_RW,
+                    true,
+                    true,
+                ) // EL1 X ok, EL0 XN
+            } else {
+                (
+                    ATTR_INDEX_NORMAL,
+                    SH_INNER_SHAREABLE,
+                    AP_EL1_RW_EL0_RW,
+                    false,
+                    false,
+                )
+            };
 
-        let (attr_index, sh, ap, pxn, uxn) = if is_mmio {
-            (
-                ATTR_INDEX_DEVICE,
-                SH_OUTER_SHAREABLE,
-                AP_EL1_RW_EL0_NO,
-                true,
-                true,
-            )
-        } else if is_ktext {
-            (
-                ATTR_INDEX_NORMAL,
-                SH_INNER_SHAREABLE,
-                AP_EL1_RO_EL0_RO,
-                false,
-                false,
-            ) // ROX shared
-        } else if is_krodata {
-            (
-                ATTR_INDEX_NORMAL,
-                SH_INNER_SHAREABLE,
-                AP_EL1_RO_EL0_RO,
-                true,
-                true,
-            ) // RO, XN
-        } else if is_kdata {
-            (
-                ATTR_INDEX_NORMAL,
-                SH_INNER_SHAREABLE,
-                AP_EL1_RW_EL0_RW,
-                true,
-                true,
-            ) // EL1 RW, XN
-        } else if is_boot0 {
-            (
-                ATTR_INDEX_NORMAL,
-                SH_INNER_SHAREABLE,
-                AP_EL1_RW_EL0_RW,
-                true,
-                true,
-            ) // EL1 X ok, EL0 XN
-        } else {
-            (
-                ATTR_INDEX_NORMAL,
-                SH_INNER_SHAREABLE,
-                AP_EL1_RW_EL0_RW,
-                false,
-                false,
-            )
-        };
+            let l1_index = block_idx / 512; // 512 × 2 MiB = 1 GiB per L2 table
+            let l2_index = block_idx % 512;
 
-        let l1_index = block_idx / 512; // 512 × 2 MiB = 1 GiB per L2 table
-        let l2_index = block_idx % 512;
+            let l2_table = l2_table_for_l1_index_cpuid(l1_index, cpuid);
+            (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
+        }
 
-        let l2_table = l2_table_for_l1_index(l1_index);
-        (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
-    }
 }
 
 linker_symbols! {
@@ -294,45 +291,49 @@ linker_symbols! {
 }
 
 pub unsafe fn init_user_page_tables() {
+    let cpuid = cpu::cpuid() as usize;
+
     let user_start_pa = USER_START() as u64;
 
-    let mut writer = PL011::default();
-    writer.enable();
+    if cpuid == 0 {
+        let mut writer = PL011::default();
+        writer.enable();
 
-    writeln!(writer, "Mapping user code to: {:#X}", user_start_pa);
-    writeln!(writer, "USER_STACK_EL0_TOP: {:#X}", USER_STACK());
+        writeln!(writer, "Mapping user code to: {:#X}", user_start_pa);
+        writeln!(writer, "USER_STACK_EL0_TOP: {:#X}", USER_STACK());
 
-    writeln!(
-        writer,
-        "KTEXT: [{:X} - {:X}]",
-        KERNEL_TEXT_START(),
-        KERNEL_TEXT_END()
-    );
-    writeln!(
-        writer,
-        "KRODATA: [{:X} - {:X}]",
-        KERNEL_RODATA_START(),
-        KERNEL_RODATA_END()
-    );
-    writeln!(
-        writer,
-        "KDATA: [{:X} - {:X}]",
-        KERNEL_DATA_START(),
-        KERNEL_DATA_END()
-    );
+        writeln!(
+            writer,
+            "KTEXT: [{:X} - {:X}]",
+            KERNEL_TEXT_START(),
+            KERNEL_TEXT_END()
+        );
+        writeln!(
+            writer,
+            "KRODATA: [{:X} - {:X}]",
+            KERNEL_RODATA_START(),
+            KERNEL_RODATA_END()
+        );
+        writeln!(
+            writer,
+            "KDATA: [{:X} - {:X}]",
+            KERNEL_DATA_START(),
+            KERNEL_DATA_END()
+        );
 
-    debug_assert_eq!(
-        user_start_pa & (L2_BLOCK_SIZE - 1),
-        0,
-        "__user_start not 2MiB-aligned"
-    );
+        debug_assert_eq!(
+            user_start_pa & (L2_BLOCK_SIZE - 1),
+            0,
+            "__user_start not 2MiB-aligned"
+        );
 
-    let user_end_pa = USER_END() as u64;
-    debug_assert!(user_end_pa >= user_start_pa, "__user_end < __user_start");
-    debug_assert!(
-        (user_end_pa - user_start_pa) <= L2_BLOCK_SIZE,
-        "user image > 2MiB"
-    );
+        let user_end_pa = USER_END() as u64;
+        debug_assert!(user_end_pa >= user_start_pa, "__user_end < __user_start");
+        debug_assert!(
+            (user_end_pa - user_start_pa) <= L2_BLOCK_SIZE,
+            "user image > 2MiB"
+        );
+    }
 
     let user_va = user_start_pa;
 
@@ -340,7 +341,7 @@ pub unsafe fn init_user_page_tables() {
     let l1_index = block_idx / 512;
     let l2_index = block_idx % 512;
 
-    let l2_table = l2_table_for_l1_index(l1_index);
+    let l2_table = l2_table_for_l1_index_cpuid(l1_index, cpuid);
 
     (*l2_table).0[l2_index] = make_l2_block_desc(
         user_start_pa,      // PA base (2MiB aligned)
@@ -393,7 +394,8 @@ pub unsafe fn enable_mmu_el1() {
     );
 
     // TTBR0_EL1: base of L1 table.
-    let l1_pa = &raw const L1_TABLE as *const PageTable as u64;
+    let cpuid = cpu::cpuid() as usize;
+    let l1_pa = &raw const L1_TABLES[cpuid] as u64;
     asm!(
     "msr ttbr0_el1, {0}",
     "isb",

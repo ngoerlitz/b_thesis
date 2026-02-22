@@ -11,6 +11,8 @@ pub(crate) unsafe extern "C" fn _secbt(cpuid: u8) {
     #[cfg(not(feature = "single_core"))]
     {
         unsafe {
+            mmu::init_page_tables();
+            mmu::init_user_page_tables();
             mmu::enable_mmu_el1();
         }
 

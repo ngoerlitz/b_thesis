@@ -17,8 +17,10 @@ extern crate alloc;
 use crate::receiver::ReceivingActor;
 use crate::user::UserActor;
 use alloc::{format, vec};
+use alloc::alloc::Global;
 use alloc::boxed::Box;
 use alloc::string::String;
+use core::alloc::{Allocator, GlobalAlloc};
 use core::arch::asm;
 use core::iter::Map;
 use core::marker::PhantomData;
@@ -26,9 +28,11 @@ use kernel::actor::env::root::environment::RootEnvironment;
 use kernel::actor::env::user::environment::UserEnvironment;
 use kernel::boot::global::ACTOR_ROOT_ENVIRONMENT;
 use kernel::{bootstrap_system, kprintln, test};
-use zcene_core::actor::{Actor, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageChannelSender, ActorMessageSender};
+use zcene_core::actor::{Actor, ActorMessage, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageChannelSender, ActorMessageSender};
 use zcene_core::future::r#yield;
+use zcene_core::future::runtime::FutureRuntimeHandler;
 use kernel::actor::channel::OUTBOX_VA_ADDR;
+use kernel::actor::channel::pt_channel_address::PtActorMessageChannelAddress;
 use kernel::actor::channel::pt_channel_sender::PtActorMessageChannelSender;
 use kernel::actor::channel::pt_message::PtMessage::{Copy, Page};
 use kernel::actor::env::root::service::message_frame_allocator_service::MessageFrameAllocatorService;
@@ -49,6 +53,23 @@ impl RootActor {
     }
 }
 
+async fn send<A, E, H>(i: u64, actor_addr: &PtActorMessageChannelAddress<A, E, H>, context: &<RootEnvironment as ActorEnvironment>::CreateContext<'_>)
+where
+    A: Actor<E, Message = u64>,
+    E: ActorEnvironment,
+    H: FutureRuntimeHandler<Allocator = Global>,
+    H::Allocator: Allocator + Clone,
+{
+    // let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
+    // mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
+    //
+    // unsafe {
+    //     *(OUTBOX_VA_ADDR as *mut u64) = i;
+    // }
+
+    let alloc = context.environment.allocator().clone();
+    actor_addr.send_msg(Copy(Box::new_in(i, alloc))).await;
+}
 
 impl Actor<RootEnvironment> for RootActor {
     type Message = ();
@@ -57,53 +78,51 @@ impl Actor<RootEnvironment> for RootActor {
         &'a mut self,
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
-        let ping_addr = unsafe {
-            RootEnvironment::get().spawn(RootActorTest::default()).unwrap()
-        };
-
-        ping_addr.send_msg(Copy(Box::new(25))).await;
-
-        let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
-        mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
-
-        unsafe {
-            *(OUTBOX_VA_ADDR as *mut u64) = 567;
-        }
-
-        ping_addr.send_msg(Page(page_id, addr)).await;
-
-        let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
-        mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
-
-        unsafe {
-            *(OUTBOX_VA_ADDR as *mut u64) = 888;
-        }
-
-        ping_addr.send_msg(Page(page_id, addr)).await;
-
-        let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
-        mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
-
-        unsafe {
-            *(OUTBOX_VA_ADDR as *mut u64) = 999;
-        }
-
-        ping_addr.send_msg(Page(page_id, addr)).await;
-
         let user_addr2 = unsafe {
             RootEnvironment::get()
                 .spawn_user(UserActor::new(10), vec![])
                 .unwrap()
         };
 
-        let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
-        mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
+        // let user_addr = unsafe {
+        //     RootEnvironment::get()
+        //         .spawn_user(UserActor::new(20), vec![])
+        //         .unwrap()
+        // };
+        //
+        // user_addr2.send_msg(Copy(Box::new(25))).await;
+        //
+        // //
+        // for i in 0..10 {
+        //     send(i, &user_addr, &context).await;
+        //     send(i, &user_addr2, &context).await;
+        // }
 
-        unsafe {
-            *(OUTBOX_VA_ADDR as *mut u64) = 1024;
-        }
 
-        user_addr2.send_msg(Page(page_id, addr)).await;
+        let user_addr4 = unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(
+                    UserViewAddress::new(0, PhantomData)
+                ), vec![Box::new(user_addr2.clone())])
+                .unwrap()
+        };
+
+        //
+        //
+        // let user_addr2 = unsafe {
+        //     RootEnvironment::get()
+        //         .spawn_user(UserActor::new(10), vec![])
+        //         .unwrap()
+        // };
+        //
+        // let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
+        // mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
+        //
+        // unsafe {
+        //     *(OUTBOX_VA_ADDR as *mut u64) = 1024;
+        // }
+        //
+        // user_addr2.send_msg(Page(page_id, addr)).await;
 
         //
         // let user_addr1 = unsafe {
@@ -131,13 +150,13 @@ impl Actor<RootEnvironment> for RootActor {
         //         .unwrap()
         // };
         //
-        let user_addr4 = unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(
-                    UserViewAddress::new(0, PhantomData)
-                ), vec![Box::new(user_addr2.clone())])
-                .unwrap()
-        };
+        // let user_addr4 = unsafe {
+        //     RootEnvironment::get()
+        //         .spawn_user(UserSender::new(
+        //             UserViewAddress::new(0, PhantomData)
+        //         ), vec![Box::new(user_addr2.clone())])
+        //         .unwrap()
+        // };
         //
         // ActorMessageSender::send(&user_addr, 25).await;
         // ActorMessageSender::send(&user_addr, 50).await;

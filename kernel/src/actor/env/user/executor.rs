@@ -232,6 +232,7 @@ where
                             (page_id, addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
                             self.setup_memory_mappings(addr);
 
+                            kprintln!("[USER/SYSCALL] Continuing from syscall");
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
                         SvcType::ReturnEl1 => {
