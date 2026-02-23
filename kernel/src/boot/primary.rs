@@ -73,9 +73,12 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
             ((0xE8) as *mut u64).write_volatile(_el3 as usize as u64);
             ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
 
-            asm!("dc cvac, {}", in(reg) (0xE0u64), options(nostack, preserves_flags));
-            asm!("dc cvac, {}", in(reg) (0xE8u64), options(nostack, preserves_flags));
-            asm!("dc cvac, {}", in(reg) (0xF0u64), options(nostack, preserves_flags));
+            #[cfg(feature = "hardware")]
+            {
+                asm!("dc cvac, {}", in(reg) (0xE0u64), options(nostack, preserves_flags));
+                asm!("dc cvac, {}", in(reg) (0xE8u64), options(nostack, preserves_flags));
+                asm!("dc cvac, {}", in(reg) (0xF0u64), options(nostack, preserves_flags));
+            }
 
             asm!("dsb sy", "sev", "isb", options(nostack, preserves_flags));
         }
