@@ -60,15 +60,14 @@ where
     H: FutureRuntimeHandler<Allocator = Global>,
     H::Allocator: Allocator + Clone,
 {
-    // let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
-    // mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
-    //
-    // unsafe {
-    //     *(OUTBOX_VA_ADDR as *mut u64) = i;
-    // }
+    let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
+    mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
 
-    let alloc = context.environment.allocator().clone();
-    actor_addr.send_msg(Copy(Box::new_in(i, alloc))).await;
+    unsafe {
+        *(OUTBOX_VA_ADDR as *mut u64) = i;
+    }
+
+    actor_addr.send_msg(Page(page_id, addr)).await;
 }
 
 impl Actor<RootEnvironment> for RootActor {
@@ -84,91 +83,15 @@ impl Actor<RootEnvironment> for RootActor {
                 .unwrap()
         };
 
-        // let user_addr = unsafe {
-        //     RootEnvironment::get()
-        //         .spawn_user(UserActor::new(20), vec![])
-        //         .unwrap()
-        // };
-        //
-        // user_addr2.send_msg(Copy(Box::new(25))).await;
-        //
-        // //
-        // for i in 0..10 {
-        //     send(i, &user_addr, &context).await;
-        //     send(i, &user_addr2, &context).await;
-        // }
 
+        for i in 0..50 {
+            user_addr2.send_msg(Copy(Box::new(i))).await;
+        }
 
-        let user_addr4 = unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(
-                    UserViewAddress::new(0, PhantomData)
-                ), vec![Box::new(user_addr2.clone())])
-                .unwrap()
-        };
+        for i in 50..100 {
+            send(i, &user_addr2, &context).await;
+        }
 
-        //
-        //
-        // let user_addr2 = unsafe {
-        //     RootEnvironment::get()
-        //         .spawn_user(UserActor::new(10), vec![])
-        //         .unwrap()
-        // };
-        //
-        // let (page_id, addr) = context.environment.message_frame_allocator().lock().alloc_frame_addr().unwrap();
-        // mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
-        //
-        // unsafe {
-        //     *(OUTBOX_VA_ADDR as *mut u64) = 1024;
-        // }
-        //
-        // user_addr2.send_msg(Page(page_id, addr)).await;
-
-        //
-        // let user_addr1 = unsafe {
-        //     RootEnvironment::get()
-        //         .spawn_user(UserActor::new(20), vec![])
-        //         .unwrap()
-        // };
-        //
-        // user_addr2.send(77u64).await;
-        // user_addr2.send(90u64).await;
-        // user_addr2.send(140u64).await;
-        // user_addr2.send(832u64).await;
-        //
-        // user_addr1.send(77u64).await;
-        // user_addr1.send(90u64).await;
-        // user_addr1.send(140u64).await;
-        // user_addr1.send(832u64).await;
-
-
-
-        //
-        // let user_addr3 = unsafe {
-        //     RootEnvironment::get()
-        //         .spawn_user(UserActor::default(), vec![])
-        //         .unwrap()
-        // };
-        //
-        // let user_addr4 = unsafe {
-        //     RootEnvironment::get()
-        //         .spawn_user(UserSender::new(
-        //             UserViewAddress::new(0, PhantomData)
-        //         ), vec![Box::new(user_addr2.clone())])
-        //         .unwrap()
-        // };
-        //
-        // ActorMessageSender::send(&user_addr, 25).await;
-        // ActorMessageSender::send(&user_addr, 50).await;
-        // ActorMessageSender::send(&user_addr, 75).await;
-        //
-        // ActorMessageSender::send(&user_addr3, 25).await;
-        // ActorMessageSender::send(&user_addr3, 50).await;
-        // ActorMessageSender::send(&user_addr3, 75).await;
-        //
-        // let new_actor = ReceivingActor::default();
-
-        kprintln!("[ROOT] Sent message to `user_addr` channel");
         Ok(())
     }
 

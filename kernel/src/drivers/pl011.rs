@@ -131,6 +131,8 @@ impl Default for PL011 {
         pl011.set_parity(SerialParity::None);
         pl011.set_data_bits(SerialDataBits::Eight);
 
+        pl011.enable();
+
         pl011
     }
 }

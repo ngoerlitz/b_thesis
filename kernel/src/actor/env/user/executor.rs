@@ -232,7 +232,8 @@ where
                             (page_id, addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
                             self.setup_memory_mappings(addr);
 
-                            kprintln!("[USER/SYSCALL] Continuing from syscall");
+                            kprintln!("NEW ADDRS: [{:#X}, {:#X}]", page_id, addr);
+
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
                         SvcType::ReturnEl1 => {
@@ -272,9 +273,8 @@ where
             }
         }
 
-        RootEnvironment::get().message_frame_allocator().lock().free_frame(page_id);
-
         cpu::disable_irq();
+        RootEnvironment::get().message_frame_allocator().lock().free_frame(page_id);
         RootEnvironment::get().user_stack_manager().lock().free_stack(r.0);
     }
 

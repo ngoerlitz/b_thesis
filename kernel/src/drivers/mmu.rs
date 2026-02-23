@@ -5,6 +5,10 @@ use crate::hal::driver::Driver;
 use crate::{kprintln, linker_symbols};
 use core::arch::asm;
 use core::fmt::Write;
+use core::hint::unreachable_unchecked;
+use core::ptr::{null, null_mut};
+use crate::actor::channel::pt_message::PtMessage::Page;
+use crate::boot::primary::{HEAP_END, HEAP_START};
 use crate::platform::aarch64::cpu;
 
 const NUM_CORES: usize = 4;
@@ -71,8 +75,42 @@ const DESC_UXN: u64 = 1 << 54; // Unprivileged Execute Never
 #[derive(Copy, Clone)]
 pub struct PageTable([u64; 512]);
 
-static mut L1_TABLES: [PageTable; NUM_CORES] = [PageTable([0; 512]); NUM_CORES];
-static mut L2_TABLES: [[PageTable; 4]; NUM_CORES] = [[PageTable([0; 512]); 4]; NUM_CORES]; // PageTable([0; 512]) * NUM_CORES
+static mut L1_TABLE_0: PageTable = PageTable([0; 512]);
+static mut L1_TABLE_1: PageTable = PageTable([0; 512]);
+static mut L1_TABLE_2: PageTable = PageTable([0; 512]);
+static mut L1_TABLE_3: PageTable = PageTable([0; 512]);
+
+
+static mut L2_TABLES_0: [PageTable; 4] = [PageTable([0; 512]); 4];
+static mut L2_TABLES_1: [PageTable; 4] = [PageTable([0; 512]); 4];
+static mut L2_TABLES_2: [PageTable; 4] = [PageTable([0; 512]); 4];
+static mut L2_TABLES_3: [PageTable; 4] = [PageTable([0; 512]); 4];
+
+fn get_l1_table(cpuid: usize) -> *mut PageTable {
+    unsafe {
+        match cpuid {
+            0 => &raw mut L1_TABLE_0,
+            1 => &raw mut L1_TABLE_1,
+            2 => &raw mut L1_TABLE_2,
+            3 => &raw mut L1_TABLE_3,
+            _ => unreachable_unchecked()
+        }
+    }
+}
+
+fn get_l2_table(cpuid: usize, index: usize) -> *mut PageTable {
+    unsafe {
+        match cpuid {
+            0 => &raw mut L2_TABLES_0[index],
+            1 => &raw mut L2_TABLES_1[index],
+            2 => &raw mut L2_TABLES_2[index],
+            3 => &raw mut L2_TABLES_3[index],
+            _ => unreachable_unchecked()
+        }
+    }
+}
+
+
 
 /// Create a table descriptor that points to the next-level table.
 fn make_table_desc(next_level_table_pa: u64) -> u64 {
@@ -119,16 +157,6 @@ fn make_l2_block_desc(pa: u64, attr_index: u64, sh: u64, ap: u64, pxn: bool, uxn
     desc
 }
 
-/// Return a mutable reference to the L2 table corresponding to an L1 index.
-unsafe fn l2_table_for_l1_index(l1_index: usize) -> *mut PageTable {
-    let cpuid = cpu::cpuid() as usize;
-    &raw mut L2_TABLES[cpuid][l1_index]
-}
-
-unsafe fn l2_table_for_l1_index_cpuid(l1_index: usize, cpuid: usize) -> *mut PageTable {
-    &raw mut L2_TABLES[cpuid][l1_index]
-}
-
 pub fn map_va_pa(va: u64, pa: u64) {
     let cpuid = cpu::cpuid() as usize;
 
@@ -157,7 +185,7 @@ pub fn map_va_pa_with_attrs_for_core(
         let l1_index = block_idx / 512;
         let l2_index = block_idx % 512;
 
-        let l2_table = l2_table_for_l1_index_cpuid(l1_index, cpuid);
+        let l2_table = get_l2_table(cpuid, l1_index);
         (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
 
         tlb_invalidate_va_2mib(va);
@@ -188,8 +216,10 @@ pub unsafe fn init_page_tables() {
 
     // 1 GiB chunks → 4 L1 entries.
     for l1_index in 0..4usize {
-        let l2 = l2_table_for_l1_index_cpuid(l1_index, cpuid) as u64;
-        L1_TABLES[cpuid].0[l1_index] = make_table_desc(l2);
+        let l1 = get_l1_table(cpuid);
+        let l2 = get_l2_table(cpuid, l1_index) as u64;
+
+        (*l1).0[l1_index] = make_table_desc(l2);
     }
 
     // Fill L2 blocks for the whole 4 GiB range.
@@ -271,7 +301,7 @@ pub unsafe fn init_page_tables() {
             let l1_index = block_idx / 512; // 512 × 2 MiB = 1 GiB per L2 table
             let l2_index = block_idx % 512;
 
-            let l2_table = l2_table_for_l1_index_cpuid(l1_index, cpuid);
+            let l2_table = get_l2_table(cpuid, l1_index);
             (*l2_table).0[l2_index] = make_l2_block_desc(pa, attr_index, sh, ap, pxn, uxn);
         }
 
@@ -341,7 +371,7 @@ pub unsafe fn init_user_page_tables() {
     let l1_index = block_idx / 512;
     let l2_index = block_idx % 512;
 
-    let l2_table = l2_table_for_l1_index_cpuid(l1_index, cpuid);
+    let l2_table = get_l2_table(cpuid, l1_index);
 
     (*l2_table).0[l2_index] = make_l2_block_desc(
         user_start_pa,      // PA base (2MiB aligned)
@@ -395,7 +425,7 @@ pub unsafe fn enable_mmu_el1() {
 
     // TTBR0_EL1: base of L1 table.
     let cpuid = cpu::cpuid() as usize;
-    let l1_pa = &raw const L1_TABLES[cpuid] as u64;
+    let l1_pa = get_l1_table(cpuid) as u64;
     asm!(
     "msr ttbr0_el1, {0}",
     "isb",

@@ -59,7 +59,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
             logger,
             irq_manager: RwLock::new(IrqManagerService::new(GIC400::new())),
             user_stack_manager: Mutex::new(StackAllocator::new(STACK_EL0_TOP(), USER_STACK_SIZE)),
-            message_frame_allocator: Mutex::new(MessageFrameAllocatorService::new(0x40200000))
+            message_frame_allocator: Mutex::new(MessageFrameAllocatorService::new(0x4000_0000))
         }
     }
 
@@ -70,6 +70,8 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
     getter!(message_frame_allocator: Mutex<MessageFrameAllocatorService>);
 
     pub fn enter(&self) -> Result<(), ActorEnterError> {
+        kprintln!("Entered future runtime...");
+
         self.future_runtime.run();
 
         Ok(())

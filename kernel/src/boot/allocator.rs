@@ -1,4 +1,4 @@
-use crate::linker_symbols;
+use crate::{kprintln, linker_symbols};
 use linked_list_allocator::LockedHeap;
 
 linker_symbols! {
@@ -11,8 +11,8 @@ static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 pub fn init_heap() {
     unsafe {
-        let start = 0x40004700usize;
-        let heap_size = 0x7d000;
+        let start = HEAP_START();
+        let heap_size = HEAP_END() - HEAP_START();
 
         ALLOCATOR.lock().init(start as *mut u8, heap_size);
     }

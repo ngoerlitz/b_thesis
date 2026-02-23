@@ -1,7 +1,7 @@
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
 use crate::actor::runtime::handler::RuntimeHandler;
-use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER};
+use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER, ROOT_ENVIRONMENT_READY};
 use crate::boot::secondary::kernel_secondary;
 use crate::boot::{
     CpuBootInformation, KSTACK_01_TOP, KSTACK_02_TOP, KSTACK_03_TOP, MAILBOX_TOP, allocator,
@@ -20,9 +20,11 @@ use core::arch::asm;
 use core::fmt::{Debug, Display, Formatter};
 use core::time::Duration;
 use core::{fmt, ptr};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 use zcene_core::actor::{Actor, ActorEnvironmentSpawn, ActorEnvironmentSpawnable};
 use zcene_core::future::runtime::FutureRuntime;
+use crate::drivers::mmu::map_va_pa_with_attrs_for_core;
 
 pub static UART0: spin::mutex::Mutex<PL011> =
     spin::mutex::Mutex::new(unsafe { PL011::new(bsp::constants::UART0_BASE) });
@@ -30,6 +32,8 @@ pub static UART0: spin::mutex::Mutex<PL011> =
 linker_symbols! {
     EL1_STACK_TOP = __kstack_end;
     EL1_STACK_SIZE = KSTACK_SIZE;
+    HEAP_START = __heap_start;
+    HEAP_END = __heap_end;
 }
 
 unsafe extern "C" {
@@ -37,6 +41,23 @@ unsafe extern "C" {
 }
 
 pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
+    #[cfg(not(feature = "single_core"))]
+    {
+        unsafe {
+            // 0xD8
+            // 0xE0
+            // 0xE8
+            // 0xF0
+            ((0xE0) as *mut u64).write_volatile(_el3 as usize as u64);
+            ((0xE8) as *mut u64).write_volatile(_el3 as usize as u64);
+            ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
+
+            asm!("dsb ishst", "sev", "isb", options(nostack, nomem));
+        }
+    }
+    
+    loop {}
+
     unsafe {
         drivers::mmu::init_page_tables();
         drivers::mmu::init_user_page_tables();
@@ -58,21 +79,27 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
             .write(x.into());
     }
 
+    ROOT_ENVIRONMENT_READY.store(1, Ordering::Release);
+
+    unsafe { core::arch::asm!("sev", options(nostack, nomem, preserves_flags)); }
+
     #[cfg(feature = "test")]
     test::test_all();
 
-    // Bring up the other cores
-    unsafe {
-        // 0xD8
-        // 0xE0
-        // 0xE8
-        // 0xF0
-        ((0xE0) as *mut u64).write_volatile(_el3 as usize as u64);
-        ((0xE8) as *mut u64).write_volatile(_el3 as usize as u64);
-        ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
-    }
-
     kprintln!("[INFO] Kernel Initializing.");
+
+    let start = HEAP_START();
+    let end   = HEAP_END();
+    let size_bytes = end - start;
+    let size_mib = size_bytes / 0x100000;
+
+    kprintln!(
+        "HEAP: [{:#X} - {:#X}] ({} MiB)",
+        start,
+        end,
+        size_mib
+    );
+
     kprintln!("STACKS");
     for i in 0..4 {
         kprintln!("{i} ]{:#0X} - {:#0X}]", EL1_STACK_TOP() - (EL1_STACK_SIZE() * (i + 1)), EL1_STACK_TOP() - (EL1_STACK_SIZE() * i));

@@ -3,12 +3,18 @@ __rpi_phys_dram_start_addr = 0;
 /* The physical address at which the the kernel binary will be loaded by the Raspberry's firmware */
 __rpi_phys_binary_load_addr = 0x80000;
 
-/* ---- constants ---- */
-HEAP_SIZE    = 1024M;
+/* HEAP = [1GB - 2GB[ */
+__heap_start = __user_end;
+__heap_end = 0x40000000 - 0x08000000; /* 128MiB rpi reserved */
 
+
+/* ---- constants ---- */
 NUM_CORES = 4;
-USTACK_SIZE = 32K;
+NUM_USTACKS = 64;
+
+USTACK_SIZE = 4K;
 KSTACK_SIZE = 16K;
+
 
 ENTRY(_start)
 
@@ -96,7 +102,7 @@ SECTIONS
     .user_stack (NOLOAD) : ALIGN(16)
     {
         __ustack_start = .;
-        . = . + (2 * USTACK_SIZE * NUM_CORES);
+        . = . + (USTACK_SIZE * NUM_USTACKS);
         __ustack_end = .;
     }
 

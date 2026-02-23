@@ -1,40 +1,17 @@
 .globl _secondary_release
-.globl _secbt
+.extern _secbt
 .extern __kstack_end
 .extern KSTACK_SIZE
 
-/*
-_park_secondary:
-    mrs x0, mpidr_el1
-    and x0, x0, #0x3            // CoreID
-
-    cbnz x0, .L_secondary       // CoreID == 0
-    ret
-
-.L_secondary:
-    // Calculate Core Release ADDR
-    // Base = 0xD8 + (8 * CoreID)
-
-    mov x1, #0xD8       // Base Addr
-    mov x2, #0x8        // Stride
-    madd x3, x0, x2, x1 // x3 = (CoreID * Stride) + Base Addr
-
-1:
-    ldr x4, [x3]        // Load rel addr
-    cbz x4, 2f          // If zero continue waiting
-    b .L_release
-
-2:
-    b 1b
-    */
-
 _secondary_release:
+    mrs x0, mpidr_el1
+    and x0, x0, #0xFF
+
     // Load stack for core (this is __KSTACK_BASE - (__KSTACK_SIZE * CoreID))
     adrp x1, __kstack_end
     add x1, x1, :lo12:__kstack_end
 
-    adrp x2, KSTACK_SIZE
-    add x2, x2, :lo12:KSTACK_SIZE
+    ldr x2, =KSTACK_SIZE
 
     msub x3, x0, x2, x1
     mov sp, x3
