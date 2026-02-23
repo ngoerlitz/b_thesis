@@ -64,7 +64,7 @@ where
     mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
 
     unsafe {
-        *(OUTBOX_VA_ADDR as *mut u64) = i;
+        *(OUTBOX_VA_ADDR as *mut u64) = 123;
     }
 
     actor_addr.send_msg(Page(page_id, addr)).await;
@@ -84,12 +84,34 @@ impl Actor<RootEnvironment> for RootActor {
         };
 
 
-        for i in 0..50 {
-            user_addr2.send_msg(Copy(Box::new(i))).await;
+        unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
+                .unwrap();
         }
 
-        for i in 50..100 {
-            send(i, &user_addr2, &context).await;
+        unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
+                .unwrap();
+        }
+
+        unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
+                .unwrap();
+        }
+
+        unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
+                .unwrap();
+        }
+
+        unsafe {
+            RootEnvironment::get()
+                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
+                .unwrap();
         }
 
         Ok(())

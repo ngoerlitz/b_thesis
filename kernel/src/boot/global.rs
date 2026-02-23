@@ -19,5 +19,3 @@ pub static IRQ_MANAGER: RwLock<IrqManagerService<GIC400, 216>> =
 pub static ACTOR_ROOT_ENVIRONMENT: SyncUnsafeCell<
     MaybeUninit<Arc<RootEnvironment<RuntimeHandler>>>,
 > = SyncUnsafeCell::new(MaybeUninit::uninit());
-
-pub static ROOT_ENVIRONMENT_READY: AtomicU8 = AtomicU8::new(0);

@@ -1,7 +1,7 @@
 use crate::actor::env::root::environment::RootEnvironment;
 use crate::actor::env::root::service::actor_root_logger_service::ActorRootLoggerService;
 use crate::actor::runtime::handler::RuntimeHandler;
-use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER, ROOT_ENVIRONMENT_READY};
+use crate::boot::global::{ACTOR_ROOT_ENVIRONMENT, IRQ_MANAGER};
 use crate::boot::secondary::kernel_secondary;
 use crate::boot::{
     CpuBootInformation, KSTACK_01_TOP, KSTACK_02_TOP, KSTACK_03_TOP, MAILBOX_TOP, allocator,
@@ -41,23 +41,6 @@ unsafe extern "C" {
 }
 
 pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
-    #[cfg(not(feature = "single_core"))]
-    {
-        unsafe {
-            // 0xD8
-            // 0xE0
-            // 0xE8
-            // 0xF0
-            ((0xE0) as *mut u64).write_volatile(_el3 as usize as u64);
-            ((0xE8) as *mut u64).write_volatile(_el3 as usize as u64);
-            ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
-
-            asm!("dsb ishst", "sev", "isb", options(nostack, nomem));
-        }
-    }
-    
-    loop {}
-
     unsafe {
         drivers::mmu::init_page_tables();
         drivers::mmu::init_user_page_tables();
@@ -79,9 +62,26 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
             .write(x.into());
     }
 
-    ROOT_ENVIRONMENT_READY.store(1, Ordering::Release);
+    #[cfg(not(feature = "single_core"))]
+    {
+        unsafe {
+            // 0xD8
+            // 0xE0
+            // 0xE8
+            // 0xF0
+            ((0xE0) as *mut u64).write_volatile(_el3 as usize as u64);
+            ((0xE8) as *mut u64).write_volatile(_el3 as usize as u64);
+            ((0xF0) as *mut u64).write_volatile(_el3 as usize as u64);
 
-    unsafe { core::arch::asm!("sev", options(nostack, nomem, preserves_flags)); }
+            asm!("dc cvac, {}", in(reg) (0xE0u64), options(nostack, preserves_flags));
+            asm!("dc cvac, {}", in(reg) (0xE8u64), options(nostack, preserves_flags));
+            asm!("dc cvac, {}", in(reg) (0xF0u64), options(nostack, preserves_flags));
+
+            asm!("dsb sy", "sev", "isb", options(nostack, preserves_flags));
+        }
+    }
+
+    kprintln!("Starting secondary cores @ {:#X}", _el3 as usize as u64);
 
     #[cfg(feature = "test")]
     test::test_all();

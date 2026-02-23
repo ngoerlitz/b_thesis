@@ -13,7 +13,8 @@ _secondary_release:
 
     ldr x2, =KSTACK_SIZE
 
-    msub x3, x0, x2, x1
+    mul x3, x2, x0 // STACK_SIZE * CoreID
+    sub x3, x1, x3 // Stack-End - ^
     mov sp, x3
 
     // Set interrupts (daifset, #0xF)
@@ -22,4 +23,5 @@ _secondary_release:
     // Jump to secondary kernel code
     // Moves for clarity
     mov x0, x0          // x0 = CoreID
+    mov x1, sp
     b _secbt

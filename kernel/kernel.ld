@@ -12,8 +12,8 @@ __heap_end = 0x40000000 - 0x08000000; /* 128MiB rpi reserved */
 NUM_CORES = 4;
 NUM_USTACKS = 64;
 
-USTACK_SIZE = 4K;
-KSTACK_SIZE = 16K;
+USTACK_SIZE = 16K;
+KSTACK_SIZE = 0x800000; /* 8MiB */
 
 
 ENTRY(_start)
