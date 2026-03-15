@@ -5,7 +5,7 @@ use crate::hal::irq::InterruptController;
 use crate::hal::timer::SystemTimerDriver;
 use crate::isr::context::{EL1Context, ISRContext};
 use crate::isr::el::ExceptionLevel;
-use crate::{bsp, kprintln};
+use crate::{bsp, log_dbg, kprintln};
 use crate::platform::aarch64::{cpu, get_cpu_timer};
 use core::ops::Deref;
 use crate::actor::env::user::executor_event::{IrqExecutorType, IrqType, UserExecutorEvent};
@@ -15,7 +15,7 @@ use crate::isr::irq_ctx::El0IrqContext;
 extern "C" fn el0_irq(ctx: *const El0IrqContext, ctx_el1: *mut EL1Context) {
     let (irq_svc, iar, irq_num, core_id) = super::setup_isr();
 
-    kprintln!(
+    log_dbg!(
         "[ {} | {}::IRQ @ {} --> {} ]",
         ExceptionLevel::EL0,
         core_id,

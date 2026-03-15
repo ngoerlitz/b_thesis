@@ -1,10 +1,19 @@
 use crate::kprintln;
+use crate::uprintln;
 
 #[cfg(feature = "log_debug")]
 #[macro_export]
 macro_rules! log_dbg {
     ($($arg:tt)*) => {{
         kprintln!("[DEBUG {}:{}] {}", file!(), line!(), format_args!($($arg)*));
+    }};
+}
+
+#[cfg(feature = "log_debug")]
+#[macro_export]
+macro_rules! log_dbg_usr {
+    ($($arg:tt)*) => {{
+        uprintln!("[DEBUG {}:{}] {}", file!(), line!(), format_args!($($arg)*));
     }};
 }
 
@@ -20,6 +29,13 @@ macro_rules! log_dbg_naked {
 #[macro_export]
 macro_rules! log_dbg {
     ($($arg:tt)*) => {{
+    }};
+}
+
+#[cfg(not(feature = "log_debug"))]
+#[macro_export]
+macro_rules! log_dbg_usr {
+        ($($arg:tt)*) => {{
     }};
 }
 

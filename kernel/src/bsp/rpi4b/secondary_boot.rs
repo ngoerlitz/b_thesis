@@ -5,6 +5,7 @@ use core::sync::atomic::Ordering;
 use crate::drivers::mmu;
 use crate::drivers::pl011::PL011;
 use crate::kprintln;
+use crate::platform::aarch64::get_cpu_timer;
 
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn _secbt(cpuid: u8, sp: u64) {
@@ -16,7 +17,9 @@ pub(crate) unsafe extern "C" fn _secbt(cpuid: u8, sp: u64) {
             mmu::enable_mmu_el1();
         }
 
-        kprintln!("Core {cpuid} -> SP: {:#X}", sp);
+        get_cpu_timer().init();
+
+        // log_dbg!("Core {cpuid} -> SP: {:#X}", sp);
 
         RootEnvironment::get().enter();
     }

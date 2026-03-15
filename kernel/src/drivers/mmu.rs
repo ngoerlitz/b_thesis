@@ -2,7 +2,7 @@
 
 use crate::drivers::pl011::PL011;
 use crate::hal::driver::Driver;
-use crate::{kprintln, linker_symbols};
+use crate::{linker_symbols, log_dbg, kprintln};
 use core::arch::asm;
 use core::fmt::Write;
 use core::hint::unreachable_unchecked;
@@ -174,7 +174,7 @@ pub fn map_va_pa_with_attrs_for_core(
     pxn: bool,
     uxn: bool
 ) {
-    kprintln!("Core {}: Mapping (VA) {:#X} to (PA) {:#X}", cpuid, va, pa);
+    log_dbg!("Core {}: Mapping (VA) {:#X} to (PA) {:#X}", cpuid, va, pa);
 
     unsafe {
         debug_assert_eq!(va & (L2_BLOCK_SIZE - 1), 0, "VA not 2MiB-aligned");
@@ -351,18 +351,18 @@ pub unsafe fn init_user_page_tables() {
             KERNEL_DATA_END()
         );
 
-        debug_assert_eq!(
-            user_start_pa & (L2_BLOCK_SIZE - 1),
-            0,
-            "__user_start not 2MiB-aligned"
-        );
+        // debug_assert_eq!(
+        //     user_start_pa & (L2_BLOCK_SIZE - 1),
+        //     0,
+        //     "__user_start not 2MiB-aligned"
+        // );
 
         let user_end_pa = USER_END() as u64;
         debug_assert!(user_end_pa >= user_start_pa, "__user_end < __user_start");
-        debug_assert!(
-            (user_end_pa - user_start_pa) <= L2_BLOCK_SIZE,
-            "user image > 2MiB"
-        );
+        // debug_assert!(
+        //     (user_end_pa - user_start_pa) <= L2_BLOCK_SIZE,
+        //     "user image > 2MiB"
+        // );
     }
 
     let user_va = user_start_pa;

@@ -9,7 +9,7 @@ use crate::actor::runtime::handler::RuntimeHandler;
 use crate::boot::global;
 use crate::drivers::gic400::GIC400;
 use crate::drivers::pl011::PL011;
-use crate::{getter, kprintln, linker_symbols};
+use crate::{getter, kprintln, linker_symbols, log_dbg};
 use crate::hal::serial::SerialDriver;
 use crate::services::irq_manager::IrqManagerService;
 use alloc::alloc::Global;
@@ -35,6 +35,7 @@ use crate::memory::bitmap_stack_allocator::StackAllocator;
 
 linker_symbols! {
     STACK_EL0_TOP = __stack_el0_top;
+    USTACK_SIZE = __ustack_size;
 }
 const USER_STACK_SIZE: usize = 4096;
 
@@ -58,7 +59,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
             future_runtime,
             logger,
             irq_manager: RwLock::new(IrqManagerService::new(GIC400::new())),
-            user_stack_manager: Mutex::new(StackAllocator::new(STACK_EL0_TOP(), USER_STACK_SIZE)),
+            user_stack_manager: Mutex::new(StackAllocator::new(STACK_EL0_TOP(), USTACK_SIZE())),
             message_frame_allocator: Mutex::new(MessageFrameAllocatorService::new(0x4000_0000))
         }
     }
@@ -70,7 +71,7 @@ impl<H: FutureRuntimeHandler> RootEnvironment<H> {
     getter!(message_frame_allocator: Mutex<MessageFrameAllocatorService>);
 
     pub fn enter(&self) -> Result<(), ActorEnterError> {
-        kprintln!("Entered future runtime...");
+        log_dbg!("Entered future runtime...");
 
         self.future_runtime.run();
 
@@ -146,7 +147,7 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
                 actor.create(Self::CreateContext::new(&*environment)).await;
 
                 while let Some(message) = receiver.receive().await {
-                    // kprintln!("Received message: {:?}", &message);
+                    // log_dbg!("Received message: {:?}", &message);
 
                     match message {
                         Copy(msg_box) => {
@@ -155,7 +156,7 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
                         Page(id, pa) => {
                             mmu::map_va_pa(INBOX_VA_ADDR, pa as u64);
 
-                            kprintln!("Reading message...");
+                            // log_dbg!("Reading message...");
 
                             let msg = unsafe {
                                 &*(INBOX_VA_ADDR as *const A::Message)

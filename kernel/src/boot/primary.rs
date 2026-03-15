@@ -25,6 +25,7 @@ use spin::Mutex;
 use zcene_core::actor::{Actor, ActorEnvironmentSpawn, ActorEnvironmentSpawnable};
 use zcene_core::future::runtime::FutureRuntime;
 use crate::drivers::mmu::map_va_pa_with_attrs_for_core;
+use crate::platform::aarch64::registers::cntkctl_el1::CNTKCTL_EL1;
 
 pub static UART0: spin::mutex::Mutex<PL011> =
     spin::mutex::Mutex::new(unsafe { PL011::new(bsp::constants::UART0_BASE) });
@@ -34,6 +35,8 @@ linker_symbols! {
     EL1_STACK_SIZE = KSTACK_SIZE;
     HEAP_START = __heap_start;
     HEAP_END = __heap_end;
+    USER_START = __ustack_start;
+    USER_END = __ustack_end;
 }
 
 unsafe extern "C" {
@@ -84,7 +87,7 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
         }
     }
 
-    kprintln!("Starting secondary cores @ {:#X}", _el3 as usize as u64);
+    log_dbg!("Starting secondary cores @ {:#X}", _el3 as usize as u64);
 
     #[cfg(feature = "test")]
     test::test_all();
@@ -107,6 +110,18 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
     for i in 0..4 {
         kprintln!("{i} ]{:#0X} - {:#0X}]", EL1_STACK_TOP() - (EL1_STACK_SIZE() * (i + 1)), EL1_STACK_TOP() - (EL1_STACK_SIZE() * i));
     }
+
+    let ustart = USER_START();
+    let uend   = USER_END();
+    let size_ubytes = uend - ustart;
+    let size_umib = size_ubytes / 0x100000;
+
+    kprintln!(
+        "USER STACK: [{:#X} - {:#X}] ({} MiB)",
+        USER_START(),
+        USER_END(),
+        size_umib
+    );
 
     {
         let mut irq = RootEnvironment::get().irq_manager().write();

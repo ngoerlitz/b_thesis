@@ -8,6 +8,7 @@ use crate::platform::aarch64::registers::cntp_tval_el0::CNTP_TVAL_EL0;
 use crate::platform::aarch64::registers::cntpct_el0::CNTPCT_EL0;
 use core::fmt::{Display, Formatter, Write};
 use core::time::Duration;
+use crate::platform::aarch64::registers::cntkctl_el1::CNTKCTL_EL1;
 
 #[derive(Copy, Clone)]
 pub struct EL1PhysicalTimer {
@@ -26,6 +27,8 @@ impl EL1PhysicalTimer {
     pub fn init(&mut self) {
         self.frq = Some(CNTFRQ_EL0.read());
         CNTP_CTL_EL0.clear_bit(0);
+
+        CNTKCTL_EL1.enable_bit(0);
     }
 
     pub fn mask_irq(&mut self) {

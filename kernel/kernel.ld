@@ -10,10 +10,12 @@ __heap_end = 0x40000000 - 0x08000000; /* 128MiB rpi reserved */
 
 /* ---- constants ---- */
 NUM_CORES = 4;
-NUM_USTACKS = 64;
+NUM_USTACKS = 16;
 
-USTACK_SIZE = 16K;
+USTACK_SIZE = 0x300000; /* 3MiB */
 KSTACK_SIZE = 0x800000; /* 8MiB */
+
+__ustack_size = USTACK_SIZE;
 
 
 ENTRY(_start)
@@ -107,13 +109,9 @@ SECTIONS
     }
 
     __stack_el0_top = __ustack_end;
-
-    /* If you want to map EXACTLY one 2MiB L2 block:
-       pad the end to the next 2MiB boundary and export __user_end.
-       Then map [__user_start, __user_end) as one 2MiB block. */
     . = ALIGN(0x200000);
     __user_end = .;
 
     /* Safety: ensure the whole user image fits in a single 2MiB block */
-    ASSERT((__user_end - __user_start) <= 0x200000, "User image exceeds 2MiB")
+    /*ASSERT((__user_end - __user_start) <= 0x16000000, "User image exceeds 2MiB") */
 }

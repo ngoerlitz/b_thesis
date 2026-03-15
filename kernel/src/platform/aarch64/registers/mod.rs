@@ -5,6 +5,7 @@ pub mod cntp_tval_el0;
 pub mod cntpct_el0;
 pub mod esr_el1;
 pub mod far_el1;
+pub mod cntkctl_el1;
 
 #[macro_export]
 macro_rules! aarch64_read_write_system_reg {

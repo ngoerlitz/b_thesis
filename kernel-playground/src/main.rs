@@ -11,6 +11,10 @@ mod receiver;
 mod user;
 mod user_sender;
 mod root_actor_test;
+mod benchmark_actor;
+mod pingActor;
+mod startActor;
+mod tests;
 
 extern crate alloc;
 
@@ -19,7 +23,7 @@ use crate::user::UserActor;
 use alloc::{format, vec};
 use alloc::alloc::Global;
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::alloc::{Allocator, GlobalAlloc};
 use core::arch::asm;
 use core::iter::Map;
@@ -39,8 +43,10 @@ use kernel::actor::env::root::service::message_frame_allocator_service::MessageF
 use kernel::actor::env::user::address::UserViewAddress;
 use kernel::actor::env::user::message_handler::UserMessageHandler;
 use kernel::drivers::mmu;
+use crate::benchmark_actor::BenchmarkActor;
+use crate::pingActor::PingActor;
 use crate::root_actor_test::RootActorTest;
-use crate::user_sender::UserSender;
+use crate::startActor::StartActor;
 
 #[derive(Default)]
 pub struct RootActor {
@@ -64,7 +70,7 @@ where
     mmu::map_va_pa(OUTBOX_VA_ADDR, addr as u64);
 
     unsafe {
-        *(OUTBOX_VA_ADDR as *mut u64) = 123;
+        *(OUTBOX_VA_ADDR as *mut u64) = i;
     }
 
     actor_addr.send_msg(Page(page_id, addr)).await;
@@ -77,42 +83,10 @@ impl Actor<RootEnvironment> for RootActor {
         &'a mut self,
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
-        let user_addr2 = unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserActor::new(10), vec![])
-                .unwrap()
-        };
 
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
 
-        unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
-                .unwrap();
-        }
-
-        unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
-                .unwrap();
-        }
-
-        unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
-                .unwrap();
-        }
-
-        unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
-                .unwrap();
-        }
-
-        unsafe {
-            RootEnvironment::get()
-                .spawn_user(UserSender::new(UserViewAddress::new(0, PhantomData)), vec![Box::new(user_addr2.clone())])
-                .unwrap();
-        }
+        tests::_1_2x_k2k_100_bytes_copy::register_tests();
 
         Ok(())
     }
@@ -121,7 +95,7 @@ impl Actor<RootEnvironment> for RootActor {
         self,
         _context: <RootEnvironment as ActorEnvironment>::DestroyContext<'a>,
     ) -> Result<(), ActorDestroyError> {
-        kprintln!("Destroyed!");
+        // kprintln!("Destroyed!");
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use crate::kprintln;
+use crate::{log_dbg, kprintln};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AllocError {
@@ -53,14 +53,14 @@ impl StackAllocator {
         let id = self.get_stack()?;
         let addr = self.base - (id * self.stack_size);
 
-        kprintln!("GOT STACK ADDR: {} --> {:#X}", id, addr);
+        log_dbg!("GOT STACK ADDR: {} --> {:#X}", id, addr);
 
         Ok((id, addr))
     }
 
     #[inline]
     pub fn free_stack(&mut self, id: usize) -> Result<(), FreeError> {
-        kprintln!("[USER_STACK] Freeing stack: {id}");
+        log_dbg!("[USER_STACK] Freeing stack: {id}");
 
         if id >= 64 {
             return Err(FreeError::OutOfRange);

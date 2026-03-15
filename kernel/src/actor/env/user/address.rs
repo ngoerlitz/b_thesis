@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use crate::actor::env::user::environment::UserEnvironment;
 use crate::isr::SvcType;
-use crate::{kprintln, svc_call, uprintln};
+use crate::{kprintln, log_dbg_usr, svc_call, uprintln};
 use crate::platform::aarch64::cpu::current_el;
 use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
@@ -28,7 +28,7 @@ impl<A: Actor<UserEnvironment>> ActorAddress<A, UserEnvironment> for UserViewAdd
 
 impl<A: Actor<UserEnvironment>> ActorMessageSender<A::Message> for UserViewAddress<A> {
     fn send(&self, message: A::Message) -> impl ActorFuture<'_, Result<(), ActorSendError>> {
-        uprintln!("UserAddress::send");
+        log_dbg_usr!("UserAddress::send");
 
         async move {
             let msg_ptr = &message as *const A::Message as usize;
@@ -51,7 +51,7 @@ impl<A: Actor<UserEnvironment>> ActorMessageSender<A::Message> for UserViewAddre
 
 impl<A: Actor<UserEnvironment>> UserViewAddress<A> {
     pub fn send_page(&self) -> impl ActorFuture<'_, Result<(), ActorSendError>> {
-        uprintln!("UserAddress::send_page");
+        log_dbg_usr!("UserAddress::send_page");
 
         async move {
             unsafe {

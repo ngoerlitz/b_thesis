@@ -16,7 +16,7 @@ use core::{slice};
 use core::iter::Map;
 use core::time::Duration;
 use kernel_derive::Constructor;
-use zcene_core::actor::{Actor, ActorEnvironmentAllocator, ActorMessageChannelAddress, ActorMessageChannelReceiver, ActorMessageChannelSender};
+use zcene_core::actor::{Actor, ActorEnvironment, ActorEnvironmentAllocator, ActorMessageChannelAddress, ActorMessageChannelReceiver, ActorMessageChannelSender};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use zcene_core::future::r#yield;
 use crate::actor::channel::{INBOX_VA_ADDR, OUTBOX_VA_ADDR};
@@ -79,7 +79,7 @@ where
     where
         A::Message: Debug,
     {
-        kprintln!("USER: Inside Run function!");
+        // log_dbg!("USER: Inside Run function!");
 
         self.handle(|actor, event, stack| {
             Self::execute(
@@ -91,9 +91,9 @@ where
         })
         .await;
 
-        kprintln!("USER: AFTER HANDLE");
+        // log_dbg!("USER: AFTER HANDLE");
         while let Some(message) = self.receiver.receive().await {
-            kprintln!("USER GOT MESSAGE: {:?}", &message);
+            // log_dbg!("USER GOT MESSAGE: {:?}", &message);
 
             let mut ptr: u64 = 0;
 
@@ -130,7 +130,7 @@ where
         }
 
 
-        kprintln!("USER: AFTER MESSAGE");
+        // log_dbg!("USER: AFTER MESSAGE");
 
         self.handle(|actor, event, stack| {
             Self::execute(
@@ -142,10 +142,10 @@ where
         })
         .await;
 
-        kprintln!(
-            "USER: DONE\n\
-            ================================================================================================================"
-        );
+        // log_dbg!(
+        //     "USER: DONE\n\
+        //     ================================================================================================================"
+        // );
     }
 
     fn notify_local_end_of_irq(iar: u32) {
@@ -186,7 +186,7 @@ where
             match event.take() {
                 None => break,
                 Some(UserExecutorEvent::SystemCall(ctx)) => {
-                    kprintln!("{:?} args_hex: [{:#X}, {:#X}]", ctx, ctx.args[0], ctx.args[1]);
+                    log_dbg!("{:?} args_hex: [{:#X}, {:#X}]", ctx, ctx.args[0], ctx.args[1]);
 
                     match ctx.svc_num {
                         SvcType::PrintMsg => {
@@ -210,7 +210,7 @@ where
 
                             match self.message_handlers.get(ctx.args[0] as usize) {
                                 Some(handler) => {
-                                    kprintln!("MSG_PTR: {:X}", ctx.args[1] as u64);
+                                    // log_dbg!("MSG_PTR: {:X}", ctx.args[1] as u64);
                                     let _result = handler.send(&Global, ctx.args[1] as *const ()).await;
                                 },
                                 None => todo!()
@@ -223,7 +223,7 @@ where
 
                             match self.message_handlers.get(ctx.args[0] as usize) {
                                 Some(handler) => {
-                                    kprintln!("Sending PAGE!! {:X} @ {:#X}", page_id, addr);
+                                    // log_dbg!("Sending PAGE!! {:X} @ {:#X}", page_id, addr);
                                     let _result = handler.send_page(&Global, page_id, addr).await;
                                 },
                                 None => todo!()
@@ -232,7 +232,7 @@ where
                             (page_id, addr) = RootEnvironment::get().message_frame_allocator().lock().alloc_frame_addr().unwrap();
                             self.setup_memory_mappings(addr);
 
-                            kprintln!("NEW ADDRS: [{:#X}, {:#X}]", page_id, addr);
+                            // log_dbg!("NEW ADDRS: [{:#X}, {:#X}]", page_id, addr);
 
                             Self::continue_from_syscall(&mut event, &ctx.ctx);
                         },
@@ -243,7 +243,7 @@ where
                     }
                 }
                 Some(UserExecutorEvent::Irq(ctx)) => {
-                    kprintln!("{:?}", ctx);
+                    log_dbg!("{:?}", ctx);
 
                     match ctx.irq_type {
                         IrqType::Preemption => {
@@ -259,7 +259,7 @@ where
                         IrqType::UartRx => {
                             let char = RootEnvironment::get().logger().read_char();
                             if (char.is_some()) {
-                                kprintln!("Received char: '{}'", char.unwrap() as char);
+                                log_dbg!("Received char: '{}'", char.unwrap() as char);
                             }
 
                             Self::notify_local_end_of_irq(ctx.iar);
@@ -381,7 +381,7 @@ where
         function: extern "C" fn(*mut A) -> !,
     ) {
         #[cfg(feature = "log_debug")]
-        kprintln!("actor: {}, fp: {}, event: {}, sp: {stack}", actor as u64, function as u64, event as *mut _ as u64);
+        log_dbg!("actor: {}, fp: {}, event: {}, sp: {stack}", actor as u64, function as u64, event as *mut _ as u64);
 
         unsafe {
             asm!(
