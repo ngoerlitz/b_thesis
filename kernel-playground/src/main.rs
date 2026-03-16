@@ -7,19 +7,10 @@
 #![no_std]
 #![no_main]
 
-mod receiver;
-mod user;
-mod user_sender;
-mod root_actor_test;
-mod benchmark_actor;
-mod pingActor;
-mod startActor;
 mod tests;
 
 extern crate alloc;
 
-use crate::receiver::ReceivingActor;
-use crate::user::UserActor;
 use alloc::{format, vec};
 use alloc::alloc::Global;
 use alloc::boxed::Box;
@@ -43,10 +34,7 @@ use kernel::actor::env::root::service::message_frame_allocator_service::MessageF
 use kernel::actor::env::user::address::UserViewAddress;
 use kernel::actor::env::user::message_handler::UserMessageHandler;
 use kernel::drivers::mmu;
-use crate::benchmark_actor::BenchmarkActor;
-use crate::pingActor::PingActor;
-use crate::root_actor_test::RootActorTest;
-use crate::startActor::StartActor;
+use crate::tests::sleep;
 
 #[derive(Default)]
 pub struct RootActor {
@@ -84,9 +72,65 @@ impl Actor<RootEnvironment> for RootActor {
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
 
-        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        // tests::u2u::_2x_cpy::register_tests();
 
-        tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        for i in 0..5 {
+            tests::u2u::_2x_mov::register_tests();
+            sleep(1_000_000);
+        }
+
+        sleep(50_000_000);
+
+        for i in 0..5 {
+            tests::u2u::_2x_cpy::register_tests();
+            sleep(1_000_000);
+        }
+
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_move::register_tests();
+        //
+        // sleep(50_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        //
+        // sleep(1_000_000);
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        //
+        // sleep(1_000_000);
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        //
+        // sleep(1_000_000);
+        //
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        //
+        // sleep(1_000_000);
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
+        //
+        // sleep(1_000_000);
+        // tests::_1_2x_k2k_100_bytes_copy::register_tests();
 
         Ok(())
     }

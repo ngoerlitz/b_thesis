@@ -2,6 +2,7 @@ use alloc::alloc::Global;
 use alloc::boxed::Box;
 use alloc::vec;
 use core::marker::PhantomData;
+use core::ptr;
 use zcene_core::actor::{Actor, ActorCreateError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageSender};
 use zcene_core::future::runtime::FutureRuntimeHandler;
 use kernel::actor::channel::pt_channel_address::PtActorMessageChannelAddress;
@@ -10,10 +11,10 @@ use kernel::actor::env::root::environment::RootEnvironment;
 use kernel::actor::env::user::address::UserViewAddress;
 use kernel::kprintln;
 use kernel_derive::Constructor;
-use crate::startActor::StartActor;
 use crate::tests::get_time;
 
-type TMessage = [u8; 1];
+const MESSAGE_SIZE: usize = 50_000;
+type TMessage = [u8; MESSAGE_SIZE];
 
 #[inline(always)]
 pub fn register_tests() {
@@ -68,17 +69,25 @@ where
 
     fn create<'a>(&'a mut self, context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>) -> impl ActorFuture<'a, Result<(), ActorCreateError>> {
         let target = self.target.clone();
-        let alloc = context.environment.allocator().clone();
 
         async move {
-            let mut x: [u8; 1] = [0; 1];
+            let mut msg: [u8; MESSAGE_SIZE] = [0; MESSAGE_SIZE];
 
-            for i in 0..1 {
-                x[i] = i as u8;
+            for i in 0..MESSAGE_SIZE {
+                msg[i] = i as u8;
             }
 
+            let mut x = Box::<TMessage>::new_uninit();
+
             let now = get_time();
-            target.send_msg(PtMessage::Copy(Box::new(x))).await;
+
+            unsafe {
+                ptr::copy_nonoverlapping(msg.as_ptr(), x.as_mut_ptr() as *mut u8, MESSAGE_SIZE);
+            }
+
+            let mem = unsafe {x.assume_init()};
+
+            target.send_msg(PtMessage::Copy(mem)).await;
 
             kprintln!("[CPY] -> {}", now.0);
 

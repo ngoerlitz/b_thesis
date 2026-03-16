@@ -4,9 +4,9 @@ use crate::platform::aarch64::cpu;
 
 #[macro_export]
 macro_rules! kprint {
-    ($($arg:tt)*) => {
+    ($($arg:tt)*) => {{
         $crate::utils::print::kprint(format_args!($($arg)*));
-    }
+    }}
 }
 
 #[macro_export]

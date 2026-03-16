@@ -149,9 +149,11 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
                 while let Some(message) = receiver.receive().await {
                     // log_dbg!("Received message: {:?}", &message);
 
+                    let mut forwarded: bool = false;
+
                     match message {
                         Copy(msg_box) => {
-                            actor.handle(Self::HandleContext::new(&*environment, &*msg_box)).await;
+                            actor.handle(Self::HandleContext::new(&*environment, &*msg_box, None, &mut forwarded)).await;
                         },
                         Page(id, pa) => {
                             mmu::map_va_pa(INBOX_VA_ADDR, pa as u64);
@@ -162,9 +164,12 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
                                 &*(INBOX_VA_ADDR as *const A::Message)
                             };
 
-                            actor.handle(Self::HandleContext::new(&*environment, msg)).await;
+                            actor.handle(Self::HandleContext::new(&*environment, msg, Some((id, pa)), &mut forwarded)).await;
 
-                            environment.message_frame_allocator().lock().free_frame(id);
+                            // TODO: This shouldn't free the fame, if we decided to forward it!
+                            if !forwarded {
+                                environment.message_frame_allocator().lock().free_frame(id);
+                            }
                         }
                     }
                 }

@@ -12,6 +12,8 @@ pub struct RootEnvironmentCreateCtx<'a, H: FutureRuntimeHandler> {
 pub struct RootEnvironmentHandleCtx<'a, H: FutureRuntimeHandler, M: ActorMessage> {
     pub environment: &'a RootEnvironment<H>,
     pub message: &'a M,
+    pub page: Option<(usize, usize)>,
+    pub forwarded: &'a mut bool,
 }
 
 #[derive(Constructor)]

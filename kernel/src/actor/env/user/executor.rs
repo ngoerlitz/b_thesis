@@ -5,7 +5,7 @@ use crate::actor::env::user::executor_event::{IrqExecutorType, IrqType, SystemCa
 use crate::actor::env::user::handler;
 use crate::actor::env::user::message_handler::UserMessageHandler;
 use crate::platform::aarch64::{cpu, get_cpu_timer};
-use crate::{kprintln, linker_symbols, log_dbg};
+use crate::{kprint, kprintln, linker_symbols, log_dbg};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::arch::{asm, naked_asm};
@@ -125,7 +125,7 @@ where
                 PtMessage::Page(id, _) => {
                     RootEnvironment::get().message_frame_allocator().lock().free_frame(id);
                 },
-                _ => {}
+                _ => {},
             }
         }
 
@@ -195,7 +195,7 @@ where
                             };
 
                             match str::from_utf8(slice) {
-                                Ok(s) => kprintln!("User: {}", s),
+                                Ok(s) => kprint!("User: {}", s),
                                 Err(_) => kprintln!("Invalid UTF-8 string"),
                             }
 

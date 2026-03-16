@@ -25,6 +25,7 @@ use spin::Mutex;
 use zcene_core::actor::{Actor, ActorEnvironmentSpawn, ActorEnvironmentSpawnable};
 use zcene_core::future::runtime::FutureRuntime;
 use crate::drivers::mmu::map_va_pa_with_attrs_for_core;
+use crate::platform::aarch64::registers::cntfrq_el0::CNTFRQ_EL0;
 use crate::platform::aarch64::registers::cntkctl_el1::CNTKCTL_EL1;
 
 pub static UART0: spin::mutex::Mutex<PL011> =
@@ -153,6 +154,8 @@ pub extern "C" fn kernel_main<A: Actor<RootEnvironment>>(actor: A) {
 
         let timer = get_cpu_timer();
         timer.init();
+
+        kprintln!("Timer Frq: {}", CNTFRQ_EL0.read());
 
         irq.inner_mut().core_init();
         kprintln!("{}", timer);

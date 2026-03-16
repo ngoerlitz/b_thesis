@@ -11,10 +11,10 @@ use kernel::actor::env::user::address::{MsgOf, UserViewAddress};
 use kernel::drivers::mmu;
 use kernel::kprintln;
 use kernel_derive::Constructor;
-use crate::startActor::StartActor;
 use crate::tests::get_time;
 
-type TMessage = [u8; 1];
+const MESSAGE_SIZE: usize = 250000;
+type TMessage = [u8; MESSAGE_SIZE];
 
 #[inline(always)]
 pub fn register_tests() {
@@ -77,7 +77,7 @@ where
             unsafe {
                 let out = &mut *(OUTBOX_VA_ADDR as *mut TMessage);
 
-                for i in 0..1 {
+                for i in 0..MESSAGE_SIZE {
                     out[i] = i as u8;
                 }
             }

@@ -1,7 +1,7 @@
 use core::arch::asm;
 
-pub mod _1_2x_k2k_100_bytes_copy;
-pub mod _1_2x_k2k_100_bytes_move;
+pub mod k2k;
+pub mod u2u;
 
 pub fn get_time() -> (u64, u64) {
     let ticks: u64;
@@ -17,4 +17,12 @@ pub fn get_time() -> (u64, u64) {
     }
 
     (ticks, hz)
+}
+
+pub fn sleep(c: u64) {
+    for i in 0..c {
+        unsafe {
+            asm!("nop");
+        }
+    }
 }
