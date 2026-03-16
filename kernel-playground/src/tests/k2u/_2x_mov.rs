@@ -1,15 +1,17 @@
+use alloc::alloc::Global;
 use alloc::boxed::Box;
 use alloc::vec;
-use core::marker::PhantomData;
-use zcene_core::actor::{Actor, ActorCreateError, ActorEnvironment, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageSender};
+use core::ptr;
+use zcene_core::actor::{Actor, ActorMessage, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageChannelSender, ActorMessageSender};
 use zcene_core::future::runtime::FutureRuntimeHandler;
-use kernel::actor::channel::OUTBOX_VA_ADDR;
 use kernel::actor::channel::pt_channel_address::PtActorMessageChannelAddress;
-use kernel::actor::channel::pt_message::PtMessage::Page;
+use kernel::actor::channel::pt_message::PtMessage;
 use kernel::actor::env::root::environment::RootEnvironment;
-use kernel::actor::env::user::address::{MsgOf, UserViewAddress};
+use kernel::actor::env::user::environment::UserEnvironment;
+use kernel::{kprintln, uprintln};
+use kernel::actor::channel::OUTBOX_VA_ADDR;
+use kernel::actor::channel::pt_message::PtMessage::Page;
 use kernel::drivers::mmu;
-use kernel::kprintln;
 use kernel_derive::Constructor;
 use crate::tests::get_time;
 
@@ -19,29 +21,27 @@ type TMessage<const N: usize> = [u8; N];
 pub fn register_tests<const N: usize>() {
     let root_env = RootEnvironment::get();
 
-    let receiver = root_env.spawn(
-        ReceivingActor::<N>::default()
+    let receiver = root_env.spawn_user(
+        UserReceiver::<N>::default(),
+        vec![]
     ).unwrap();
 
     root_env.spawn(
-        SendingActor::<_, _, _, N>::new(receiver)
+        KernelSender::<_, _, _, N>::new(receiver)
     ).unwrap();
 }
 
 #[derive(Default)]
-struct ReceivingActor<const N: usize>
-{
-}
+struct UserReceiver<const N: usize> {}
 
-impl<const N: usize> Actor<RootEnvironment> for ReceivingActor<N>
-{
+impl<const N: usize> Actor<UserEnvironment> for UserReceiver<N> {
     type Message = TMessage<N>;
 
-    fn handle<'a>(&mut self, context: <RootEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
+    fn handle<'a>(&mut self, context: <UserEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
         let now = get_time();
 
         async move {
-            kprintln!("[MOV] <- {}", now.0);
+            uprintln!("[MOV] <- {}", now.0);
 
             Ok(())
         }
@@ -49,7 +49,7 @@ impl<const N: usize> Actor<RootEnvironment> for ReceivingActor<N>
 }
 
 #[derive(Constructor)]
-struct SendingActor<A, E, H, const N: usize>
+struct KernelSender<A, E, H, const N: usize>
 where
     A: Actor<E, Message = TMessage<N>>,
     E: ActorEnvironment,
@@ -58,11 +58,11 @@ where
     target: PtActorMessageChannelAddress<A, E, H>
 }
 
-impl<A, E, H, const N: usize> Actor<RootEnvironment> for SendingActor<A, E, H, N>
+impl<A, E, H, const N: usize> Actor<RootEnvironment> for KernelSender<A, E, H, N>
 where
     A: Actor<E, Message = TMessage<N>>,
     E: ActorEnvironment,
-    H: FutureRuntimeHandler
+    H: FutureRuntimeHandler<Allocator = Global>
 {
     type Message = ();
 

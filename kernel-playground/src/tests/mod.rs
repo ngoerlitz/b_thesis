@@ -2,6 +2,7 @@ use core::arch::asm;
 
 pub mod k2k;
 pub mod u2u;
+pub mod k2u;
 
 pub fn get_time() -> (u64, u64) {
     let ticks: u64;

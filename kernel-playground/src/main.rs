@@ -22,7 +22,7 @@ use core::marker::PhantomData;
 use kernel::actor::env::root::environment::RootEnvironment;
 use kernel::actor::env::user::environment::UserEnvironment;
 use kernel::boot::global::ACTOR_ROOT_ENVIRONMENT;
-use kernel::{bootstrap_system, kprintln, test};
+use kernel::{bootstrap_system, kprint, kprintln, test};
 use zcene_core::actor::{Actor, ActorMessage, ActorCreateError, ActorDestroyError, ActorEnvironment, ActorEnvironmentAllocator, ActorEnvironmentSpawn, ActorFuture, ActorHandleError, ActorMessageChannelSender, ActorMessageSender};
 use zcene_core::future::r#yield;
 use zcene_core::future::runtime::FutureRuntimeHandler;
@@ -34,6 +34,7 @@ use kernel::actor::env::root::service::message_frame_allocator_service::MessageF
 use kernel::actor::env::user::address::UserViewAddress;
 use kernel::actor::env::user::message_handler::UserMessageHandler;
 use kernel::drivers::mmu;
+use kernel::utils::print::kprint;
 use crate::tests::sleep;
 
 #[derive(Default)]
@@ -64,6 +65,27 @@ where
     actor_addr.send_msg(Page(page_id, addr)).await;
 }
 
+macro_rules! run_test {
+    ($n:literal) => {{
+        kprintln!("SIZE: {} Bytes", $n);
+        for _ in 0..10 {
+            tests::k2u::_2x_mov::register_tests::<$n>();
+            sleep(1_000_000);
+        }
+
+        sleep(20_000_000);
+
+
+        for _ in 0..10 {
+            tests::k2u::_2x_cpy::register_tests::<$n>();
+            sleep(1_000_000);
+        }
+
+        kprintln!("");
+        sleep(10_000_000);
+    }};
+}
+
 impl Actor<RootEnvironment> for RootActor {
     type Message = ();
 
@@ -72,19 +94,30 @@ impl Actor<RootEnvironment> for RootActor {
         context: <RootEnvironment as ActorEnvironment>::CreateContext<'a>,
     ) -> Result<(), ActorCreateError> {
 
+        run_test!(1);
+        run_test!(1000);
+        run_test!(10000);
+        run_test!(25000);
+        run_test!(50000);
+        run_test!(100000);
+        run_test!(250000);
+
+
+
+
         // tests::u2u::_2x_cpy::register_tests();
 
-        for i in 0..5 {
-            tests::u2u::_2x_mov::register_tests();
-            sleep(1_000_000);
-        }
-
-        sleep(50_000_000);
-
-        for i in 0..5 {
-            tests::u2u::_2x_cpy::register_tests();
-            sleep(1_000_000);
-        }
+        // for i in 0..5 {
+        //     tests::u2u::_2x_mov::register_tests();
+        //     sleep(1_000_000);
+        // }
+        //
+        // sleep(50_000_000);
+        //
+        // for i in 0..5 {
+        //     tests::u2u::_2x_cpy::register_tests();
+        //     sleep(1_000_000);
+        // }
 
         // tests::_1_2x_k2k_100_bytes_move::register_tests();
         //
