@@ -3,6 +3,8 @@ use core::arch::asm;
 pub mod k2k;
 pub mod u2u;
 pub mod k2u;
+pub mod matmul;
+pub mod time_n_msg;
 
 pub fn get_time() -> (u64, u64) {
     let ticks: u64;

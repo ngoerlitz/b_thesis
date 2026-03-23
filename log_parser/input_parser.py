@@ -123,7 +123,12 @@ class InputParser:
             row_id = 0
 
             for size in sorted(self.results.keys()):
-                for entry in self.results[size]:
+                entries = self.results[size]
+
+                cpy = entries[:33][3:]   # first 33 → skip first 3
+                mov = entries[33:][3:]   # last 33 → skip first 3
+
+                for entry in cpy + mov:
                     writer.writerow([
                         row_id,
                         size,
@@ -132,7 +137,6 @@ class InputParser:
                         entry.end_tick,
                         entry.duration_s
                     ])
-
                     row_id += 1
 
             print(self.results)

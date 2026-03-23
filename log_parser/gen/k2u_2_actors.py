@@ -5,7 +5,7 @@ from gen.setup import open_df, open_df_raw, bar_plot_err, apply_basic_settings
 
 SIZES = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000]
 
-data = open_df("k2k_2_act.csv", SIZES)
+data = open_df("k2u_2_act.csv", SIZES)
 
 plt.figure(figsize=(12, 6.75))
 
@@ -28,4 +28,4 @@ bar_plot_err(ax, data, error_bar_kws={
 
 plt.ylabel("Mean duration (µs)")
 plt.xlabel("Message Size")
-plt.savefig("out/k2k_2_actors.pdf", bbox_inches="tight", pad_inches=0)
+plt.savefig("out/k2u_2_actors.pdf", bbox_inches="tight", pad_inches=0)

@@ -3,6 +3,7 @@ use crate::actor::env::user::environment::UserEnvironment;
 use crate::utils::memory::leaking_heap_memory_alloc::NoOpMemoryAllocator;
 use alloc::boxed::Box;
 use core::arch::{asm, naked_asm};
+use core::marker::PhantomData;
 use core::pin::pin;
 use core::task::{Context, Poll, Waker};
 use zcene_core::actor::Actor;
@@ -33,7 +34,7 @@ pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());
-    let mut pinned = pin!(actor.handle(UserEnvironmentHandleCtx::new(unsafe {core::ptr::read(msg)})));
+    let mut pinned = pin!(actor.handle(UserEnvironmentHandleCtx::<A::Message>::new(msg as *const _ as u64, PhantomData)));
 
     let _result = match pinned.as_mut().poll(&mut future_ctx) {
         Poll::Pending => todo!(),

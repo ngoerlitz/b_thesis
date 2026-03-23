@@ -144,7 +144,7 @@ impl<A: Actor<Self>, H: FutureRuntimeHandler> ActorEnvironmentSpawn<A> for RootE
             let environment = self.clone();
 
             async move {
-                actor.create(Self::CreateContext::new(&*environment)).await;
+                actor.create(Self::CreateContext::new(&*environment.clone(), &environment)).await;
 
                 while let Some(message) = receiver.receive().await {
                     // log_dbg!("Received message: {:?}", &message);

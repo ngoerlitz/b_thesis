@@ -106,7 +106,7 @@ build_and_objcopy() {
     features+=",test"
   fi
 
-  cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features" --verbose
+  /home/ngoerlitz/.cargo/bin/cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features" --verbose > /dev/null 2>&1
 
   if [[ ! -f "$artifact_path" ]]; then
     echo "Expected artifact not found: $artifact_path" >&2

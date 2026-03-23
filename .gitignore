@@ -5,3 +5,14 @@ kernel-derive
 *.log
 *.txt
 /.idea
+
+rpi_test_output
+test_cfg.json.state.json
+
+log_parser/_misc
+log_parser/__pycache__
+log_parser/.venv
+log_parser/_old
+log_parser/raw/*.log*
+log_parser/.idea
+log_parser/.vscode

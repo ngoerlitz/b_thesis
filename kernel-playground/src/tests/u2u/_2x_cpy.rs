@@ -14,32 +14,31 @@ use kernel::{kprintln, uprintln};
 use kernel_derive::Constructor;
 use crate::tests::get_time;
 
-const MESSAGE_SIZE: usize = 500;
-type TMessage = [u8; MESSAGE_SIZE];
+type TMessage<const N: usize> = [u8; N];
 
 #[inline(always)]
-pub fn register_tests() {
+pub fn register_tests<const N: usize>() {
     let root_env = RootEnvironment::get();
 
     let receiver = root_env.spawn_user(
-        ReceivingActor::default(),
+        ReceivingActor::<N>::default(),
         vec![]
     ).unwrap();
 
     root_env.spawn_user(
-        SendingActor::new(UserViewAddress::new(0, PhantomData)),
+        SendingActor::<N>::new(UserViewAddress::new(0, PhantomData)),
         vec![Box::new(receiver)]
     ).unwrap();
 }
 
 #[derive(Default)]
-struct ReceivingActor
+struct ReceivingActor<const N: usize>
 {
 }
 
-impl Actor<UserEnvironment> for ReceivingActor
+impl<const N: usize> Actor<UserEnvironment> for ReceivingActor<N>
 {
-    type Message = TMessage;
+    type Message = TMessage<N>;
 
     fn handle<'a>(&mut self, context: <UserEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
         let now = get_time();
@@ -53,12 +52,12 @@ impl Actor<UserEnvironment> for ReceivingActor
 }
 
 #[derive(Constructor)]
-struct SendingActor
+struct SendingActor<const N: usize>
 {
-    target: UserViewAddress<ReceivingActor>
+    target: UserViewAddress<ReceivingActor<N>>
 }
 
-impl Actor<UserEnvironment> for SendingActor
+impl<const N: usize> Actor<UserEnvironment> for SendingActor<N>
 {
     type Message = ();
 
@@ -66,18 +65,18 @@ impl Actor<UserEnvironment> for SendingActor
         let target = self.target.clone();
 
         async move {
-            let mut msg: [u8; MESSAGE_SIZE] = [0; MESSAGE_SIZE];
+            let mut msg: [u8; N] = [0; N];
 
-            for i in 0..MESSAGE_SIZE {
+            for i in 0..N {
                 msg[i] = i as u8;
             }
 
-            let mut x = Box::<TMessage>::new_uninit();
+            let mut x = Box::<TMessage<N>>::new_uninit();
 
             let now = get_time();
 
             unsafe {
-                ptr::copy_nonoverlapping(msg.as_ptr(), x.as_mut_ptr() as *mut u8, MESSAGE_SIZE);
+                ptr::copy_nonoverlapping(msg.as_ptr(), x.as_mut_ptr() as *mut u8, N);
             }
 
             let mem = unsafe {x.assume_init()};
