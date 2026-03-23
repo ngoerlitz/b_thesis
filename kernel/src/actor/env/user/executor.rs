@@ -422,7 +422,7 @@ where
         message: *const A::Message,
         event: &mut Option<UserExecutorEvent>,
         stack: u64,
-        function: extern "C" fn(*mut A, &A::Message) -> !,
+        function: extern "C" fn(*mut A, *const A::Message) -> !,
     ) {
         unsafe {
             asm!(

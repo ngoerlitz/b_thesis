@@ -28,12 +28,12 @@ pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *
 #[unsafe(link_section = ".user_text")]
 pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
     actor: *mut A,
-    msg: &A::Message,
+    msg: *const A::Message,
 ) -> ! {
     let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
 
     let mut future_ctx = Context::from_waker(Waker::noop());
-    let mut pinned = pin!(actor.handle(UserEnvironmentHandleCtx::new(msg.clone())));
+    let mut pinned = pin!(actor.handle(UserEnvironmentHandleCtx::new(unsafe {core::ptr::read(msg)})));
 
     let _result = match pinned.as_mut().poll(&mut future_ctx) {
         Poll::Pending => todo!(),
