@@ -1,3 +1,4 @@
+use alloc::alloc::Global;
 use alloc::boxed::Box;
 use core::fmt::Debug;
 use zcene_core::actor::{
@@ -30,7 +31,7 @@ where
     A: Actor<E>,
     A::Message: Debug,
     E: ActorEnvironment + ActorEnvironmentAllocator,
-    H: FutureRuntimeHandler
+    H: FutureRuntimeHandler<Allocator = Global>
 {
     fn send(
         &self,
@@ -39,10 +40,10 @@ where
     ) -> ActorBoxFuture<'static, Result<(), ActorSendError>, E> {
         let sender = self.clone();
 
-        let message: <A as Actor<E>>::Message = unsafe { message.cast::<A::Message>().as_ref().unwrap() }.clone();
+        let msg_box = unsafe { Box::from_raw(message as *mut A::Message) };
 
         Box::pin_in(
-            async move { <Self as ActorMessageSender<_>>::send(&sender, message).await },
+            async move { sender.send_msg(PtMessage::Copy(msg_box)).await },
             allocator.clone(),
         )
     }

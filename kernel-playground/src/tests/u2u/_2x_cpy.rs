@@ -75,15 +75,14 @@ impl<const N: usize> Actor<UserEnvironment> for SendingActor<N>
 
             let now = get_time();
 
+            let msg = core::hint::black_box(msg);
+
             unsafe {
                 ptr::copy_nonoverlapping(msg.as_ptr(), x.as_mut_ptr() as *mut u8, N);
             }
 
             let mem = unsafe {x.assume_init()};
-
-            target.send(*mem).await;
-
-            Box::leak(mem);
+            target.send_boxed(mem).await;
 
             uprintln!("[CPY] -> {}", now.0);
 

@@ -1,7 +1,11 @@
 {
     "rust_file": "./kernel-playground/src/main.rs",
-    "sizes": [1000, 128000],
+    "sizes": [900, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800],
     "tests": [
+        {
+            "name": "cpy",
+            "path": "tests::u2u::_2x_cpy::register_tests"
+        },
         {
             "name": "mov",
             "path": "tests::u2u::_2x_mov::register_tests"

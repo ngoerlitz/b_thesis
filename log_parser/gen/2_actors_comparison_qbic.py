@@ -61,7 +61,7 @@ plt.figure(figsize=(12, 6.75))
 ax = plt.gca()
 
 # Clip everything above this value for display clarity
-y_cap = 140
+y_cap = 200
 ax.set_ylim(10, y_cap)
 ax.set_xlim(-10, 260)
 
@@ -199,7 +199,6 @@ ax.set_ylabel("Mean duration (µs)")
 ax.legend(title="Method", loc="upper left")
 
 # Grid
-ax.yaxis.set_major_locator(MultipleLocator(10))
 ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.4)
 ax.set_axisbelow(True)
 

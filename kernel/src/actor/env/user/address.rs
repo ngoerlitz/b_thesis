@@ -50,6 +50,25 @@ impl<A: Actor<UserEnvironment>> ActorMessageSender<A::Message> for UserViewAddre
 }
 
 impl<A: Actor<UserEnvironment>> UserViewAddress<A> {
+    pub fn send_boxed(&self, message: Box<A::Message>) -> impl ActorFuture<'_, Result<(), ActorSendError>> {
+        async move {
+            let msg_ptr = Box::into_raw(message) as usize;
+
+            unsafe {
+                core::arch::asm!(
+                    "svc #{svc}",
+                    svc = const SvcType::SendMsg as u16,
+                    in("x0") self.target_actor_id,        // target actor ID
+                    in("x1") msg_ptr,
+                    options(nostack),
+                    clobber_abi("C")
+                );
+            }
+
+            Ok(())
+        }
+    }
+
     pub fn send_page(&self) -> impl ActorFuture<'_, Result<(), ActorSendError>> {
         log_dbg_usr!("UserAddress::send_page");
 
