@@ -8,12 +8,13 @@ LOG_DEBUG=0
 LOG_CORES=0
 SINGLE_CORE=0
 TEST=0
+SUPPRESS_OUTPUT=0
 EXTRA_QEMU_ARGS=()
 
 usage() {
   cat <<'USAGE'
 Usage:
-  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [--log-cores] [--single-core] [--test] [-- <extra qemu args>]
+  build.sh <qemu|rpi> [--release] [--gdb] [--log-debug] [--log-cores] [--single-core] [--test] [--suppress] [-- <extra qemu args>]
 
 Modes:
   qemu       Build QEMU feature set, create kernel8.img, run QEMU
@@ -26,6 +27,7 @@ Options:
   --log-cores  Enable cargo feature flag 'log_cores'
   --single-core Enable single core execution only
   --test        Enables additional code only compiled when testing
+  --suppress    Suppress output from cargo's build step
   -h, --help   Show this help
 
 Notes:
@@ -56,6 +58,8 @@ while [[ $# -gt 0 ]]; do
       SINGLE_CORE=1; shift ;;
     --test)
       TEST=1; shift ;;
+    --suppress)
+      SUPPRESS_OUTPUT=1; shift ;;
     --help|-h)
       usage; exit 0 ;;
     --)
@@ -106,7 +110,11 @@ build_and_objcopy() {
     features+=",test"
   fi
 
-  /home/ngoerlitz/.cargo/bin/cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features" --verbose > /dev/null 2>&1
+  if [[ $SUPPRESS_OUTPUT -eq 1 ]]; then
+    cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features" --verbose > /dev/null 2>&1
+  else
+    cargo build --target "$TARGET_TRIPLE" "${cargo_profile_flags[@]}" --features "$features" --verbose
+  fi
 
   if [[ ! -f "$artifact_path" ]]; then
     echo "Expected artifact not found: $artifact_path" >&2

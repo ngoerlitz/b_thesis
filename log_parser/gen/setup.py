@@ -7,6 +7,9 @@ from matplotlib.patches import Rectangle
 
 
 def _filename(filename: str) -> str:
+    if filename.startswith(".."):
+        return filename
+
     file = f"output/{filename}"
     if not os.path.isdir("output"):
         file = f"../output/{filename}"
@@ -24,6 +27,9 @@ def get_label_legend(op):
 
 
 def _format_size(n, force_decimals: bool):
+    if n <= 128:
+        return f"{n}"
+
     if n < 1000:
         return f"{n/1000:.1f} KB"
 
@@ -151,7 +157,6 @@ def open_df(filename: str, filter_sizes: list[int] | None = None, remove_outlier
 
     df = df.sort_values(["size_label", "op"])
 
-    print(df)
 
     return df
 

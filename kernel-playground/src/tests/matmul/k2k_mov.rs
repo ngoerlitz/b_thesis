@@ -15,8 +15,8 @@ use kernel_derive::Constructor;
 use crate::tests::get_time;
 
 type MatrixVector<const N: usize> = MatrixMessage<N>;
-type MatrixMessage<const N: usize> = [u8; N];
-type Matrix<const N: usize> = [[u8; N]; N];
+type MatrixMessage<const N: usize> = [u32; N];
+type Matrix<const N: usize> = [[u32; N]; N];
 
 type MultiplyMessage<const N: usize> = (MatrixMessage<N>, usize);
 
@@ -84,6 +84,25 @@ where
     target: PtActorMessageChannelAddress<A, E, H>
 }
 
+impl<A, E, H, const N: usize> MultiplyingActor<A, E, H, N>
+where
+    A: Actor<E, Message = ReceiveMessage>,
+    E: ActorEnvironment,
+    H: FutureRuntimeHandler<Allocator = Global>
+{
+    const fn gen_vec() -> [u32; N] {
+        let mut vec = [0; N];
+
+        let mut i = 0;
+        while i < N {
+            vec[i] = (i + 1) as u32;
+            i += 1;
+        }
+
+        vec
+    }
+}
+
 impl<A, E, H, const N: usize> Actor<RootEnvironment> for MultiplyingActor<A, E, H, N>
 where
     A: Actor<E, Message = ReceiveMessage>,
@@ -95,19 +114,15 @@ where
     fn handle<'a>(&mut self, context: <RootEnvironment as ActorEnvironment>::HandleContext<'a, Self::Message>) -> impl ActorFuture<'a, Result<(), ActorHandleError>> {
         // kprintln!("Received: {:?} -- {}", context.message.0, context.message.1);
 
-        let mut vec = [0u8; N];
-
-        for (i, item) in vec.iter_mut().enumerate() {
-            *item = (i + 1) as u8;
-        }
+        let mut vec = Self::gen_vec();
 
         let mut res: usize = 0;
 
         for (v, m) in zip(vec, context.message.0) {
-            let a: usize = v as usize;
-            let b: usize = m as usize;
+            let vu = v as usize;
+            let mu = m as usize;
 
-            res += a * b;
+            res += (vu * mu);
         }
 
         let target = self.target.clone();
@@ -157,7 +172,7 @@ where
 
         for row in m.iter_mut() {
             for item in row.iter_mut() {
-                *item = counter as u8;
+                *item = counter as u32;
 
                 counter += 1;
             }

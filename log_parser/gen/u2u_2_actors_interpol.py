@@ -15,7 +15,7 @@ ax = plt.gca()
 
 #TODO
 
-ax.axis(ymin=18, ymax=25)
+ax.axis(ymin=18, ymax=23)
 
 palette = seaborn.color_palette("Pastel1")
 

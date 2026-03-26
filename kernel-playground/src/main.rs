@@ -86,7 +86,7 @@ impl Actor<RootEnvironment> for RootActor {
         // 1, 2, 4, 8, 16, 32, 64, 128
 
         // AUTO_TEST_BEGIN
-run_test!(1800, tests::u2u::_2x_mov::register_tests);
+run_test!(1, tests::k2k::_2x_cpy::register_tests);
         // AUTO_TEST_END
 
         sleep(100_000_000);
