@@ -17,7 +17,7 @@ k2k_data["kind"] = "k2k"
 # Combine
 data = pd.concat([k2k_data], ignore_index=True)
 
-# Convert bytes -> KB
+# Convert bytes -> kB
 data["size_kb"] = data["size"]
 
 # One series per (kind, op)

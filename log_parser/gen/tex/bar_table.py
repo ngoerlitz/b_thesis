@@ -42,8 +42,8 @@ def gen_table(data: pd.DataFrame, output_file: str | None, header: str | None = 
 
         rel = cpy["mean_us"] / mov["mean_us"]
         rel_err = np.sqrt(
-            (cpy["sem_us"] / cpy["mean_us"])**2 +
-            (mov["sem_us"] / mov["mean_us"])**2
+            (cpy["std_us"] / cpy["mean_us"])**2 +
+            (mov["std_us"] / mov["mean_us"])**2
         ) * rel
 
         tabledata += fr"""

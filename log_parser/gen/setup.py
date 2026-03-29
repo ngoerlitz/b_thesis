@@ -31,17 +31,17 @@ def _format_size(n, force_decimals: bool):
         return f"{n}"
 
     if n < 1000:
-        return f"{n/1000:.1f} KB"
+        return f"{n/1000:.1f} kB"
 
     if not force_decimals:
-        return f"{n/1000:g} KB"
+        return f"{n/1000:g} kB"
     else:
-        return f"{n/1000:.1f} KB"
+        return f"{n/1000:.1f} kB"
 
     if n < 1000:
         return f"{n} B"
     elif n < 1_000_000:
-        return f"{n/1000:g} KB"
+        return f"{n/1000:g} kB"
     elif n < 1_000_000_000:
         return f"{n/1_000_000:g} MB"
     else:
@@ -328,7 +328,7 @@ def make_latency_latex_table(
 
     def fmt_size(n: int) -> str:
         if n % 1000 == 0:
-            return f"{int(n/1000)} KB"
+            return f"{int(n/1000)} kB"
         return f"{n} B"
 
     def fmt_val(x):

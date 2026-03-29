@@ -70,7 +70,7 @@ ax.axvline(x=x_intersect, linestyle="--", color="gray", linewidth=1)
 ax.text(
     x_intersect - 350,
     ax.get_ylim()[0] + 0.05,
-    f"{x_intersect/1000:.2f} KB",
+    f"{x_intersect/1000:.2f} kB",
     color="gray",
     ha="center",
     va="bottom"

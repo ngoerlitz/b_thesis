@@ -21,7 +21,7 @@ u2u_data["kind"] = "u2u"
 # Combine
 data = pd.concat([k2k_data, k2u_data, u2u_data], ignore_index=True)
 
-# Convert bytes -> KB
+# Convert bytes -> kB
 data["size_kb"] = data["size"] / 1000.0
 
 # One series per (kind, op)
@@ -192,7 +192,7 @@ for (kind, op) in series_order:
     # )
 
 # Axes
-ax.set_xlabel("Message Size (KB)")
+ax.set_xlabel("Message Size (kB)")
 ax.set_ylabel("Mean duration (µs)")
 
 # Legend
