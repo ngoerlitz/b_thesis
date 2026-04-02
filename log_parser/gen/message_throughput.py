@@ -19,9 +19,9 @@ for df in [k2k_data, k2u_data, u2u_data]:
     df["throughput_GB_s"] = df["size"] / df["mean_us"] / 1000
 
 # Add context labels
-k2k_data["context"] = "Kernel - Kernel"
-k2u_data["context"] = "Kernel - User"
-u2u_data["context"] = "User - User"
+k2k_data["context"] = "Kernel to Kernel"
+k2u_data["context"] = "Kernel to User"
+u2u_data["context"] = "User to User"
 
 # Combine all data
 data = pd.concat([k2k_data, k2u_data, u2u_data], ignore_index=True)
@@ -49,7 +49,7 @@ for (label, color) in zip(labels, palette):
         ax=ax,
         label=label,
         color=color,
-        order=3,
+        order=2,
         scatter_kws={
             "s": 40,
             "edgecolor": "black",
@@ -83,6 +83,6 @@ ax.set_axisbelow(True)
 
 plt.ylabel("Throughput (GB/s)")
 plt.xlabel("Message Size")
-plt.legend(title="Method", loc="upper left")
+plt.legend(title="Method", loc="upper left", markerscale=1.3, handleheight=1.2)
 
 plt.savefig("out/message_throughput.pdf", bbox_inches="tight", pad_inches=0)

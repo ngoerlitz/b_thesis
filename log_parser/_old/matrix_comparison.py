@@ -28,7 +28,7 @@ palette = [palette[i] for i in [0,1,2,3,4,6,7,8]]
 palette = palette[:len(series_order)]
 
 series_labels = {
-    ("k2k", "Move"): "Page Table Move",
+    ("k2k", "Move"): "Page Move",
     ("k2k", "Copy"): "Message Copy",
 }
 

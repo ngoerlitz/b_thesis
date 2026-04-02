@@ -6,64 +6,45 @@ from matplotlib.ticker import MultipleLocator
 
 from gen.setup import open_df, make_latency_latex_table
 
-SIZES = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000]
+SIZES = [1, 2, 4, 8, 16, 32, 64, 128]
 
 # Load data
-k2k_data = open_df("k2k_2_act.csv", SIZES).copy()
-k2u_data = open_df("k2u_2_act.csv", SIZES).copy()
-u2u_data = open_df("u2u_2_act.csv", SIZES).copy()
+k2k_data = open_df("matmul.csv", SIZES).copy()
 
 # Tag transport kind
 k2k_data["kind"] = "k2k"
-k2u_data["kind"] = "k2u"
-u2u_data["kind"] = "u2u"
 
 # Combine
-data = pd.concat([k2k_data, k2u_data, u2u_data], ignore_index=True)
+data = pd.concat([k2k_data], ignore_index=True)
 
 # Convert bytes -> kB
-data["size_kb"] = data["size"] / 1000.0
+data["size_kb"] = data["size"]
 
 # One series per (kind, op)
 series_order = [
     ("k2k", "Move"),
     ("k2k", "Copy"),
-    ("k2u", "Move"),
-    ("k2u", "Copy"),
-    ("u2u", "Move"),
-    ("u2u", "Copy"),
 ]
 
 palette = sns.color_palette("Pastel1", 15)
 palette = [palette[i] for i in [0, 1, 2, 3, 4, 6]]
 
 series_labels = {
-    ("k2k", "Move"): "Kernel - Kernel / Page Table Move",
-    ("k2k", "Copy"): "Kernel - Kernel / Message Copy",
-    ("k2u", "Move"): "Kernel - User / Page Table Move",
-    ("k2u", "Copy"): "Kernel - User / Message Copy",
-    ("u2u", "Move"): "User - User / Page Table Move",
-    ("u2u", "Copy"): "User - User / Message Copy",
+    ("k2k", "Move"): "Page Move",
+    ("k2k", "Copy"): "Message Copy",
 }
-
-print(make_latency_latex_table(data, series_labels))
 
 # Pastel1 palette
 color_map = {series: color for series, color in zip(series_order, palette)}
-
-# Minimum y-value for displaying fitted curves, per series.
-# This only affects the displayed interpolation line, not the fit itself.
-display_y_min = {
-    ("u2u", "Copy"): 16,  # change this to whatever floor you want
-}
 
 plt.figure(figsize=(12, 6.75))
 ax = plt.gca()
 
 # Clip everything above this value for display clarity
-y_cap = 200
-ax.set_ylim(10, y_cap)
-ax.set_xlim(-10, 260)
+y_cap = 6000
+ax.set_ylim(50, y_cap)
+ax.set_yscale("log")
+ax.set_xlim(0, 130)
 
 # Keep track of whether we already added the truncation note
 has_clipped_points = False
@@ -137,15 +118,11 @@ for (kind, op) in series_order:
     y_line = poly(x_line)
 
     # Display-only clipping
-    y_floor = display_y_min.get((kind, op), None)
-    if y_floor is not None:
-        y_line_display = np.clip(y_line, y_floor, y_cap)
-    else:
-        y_line_display = np.minimum(y_line, y_cap)
+    y_floor = None
 
     ax.plot(
         x_line,
-        y_line_display,
+        y_line,
         color=color,
         linewidth=3.0,
         zorder=2,
@@ -166,21 +143,8 @@ for (kind, op) in series_order:
         x_visible_last = x_line[-1]
         y_visible_last = y_cap - 10
 
-    if op == "Copy" and kind == "u2u":
-        x_text = x_visible_last
-        y_text = max(y_visible_last - 10, display_y_min.get((kind, op), -np.inf))
-
-    elif op == "Move" and kind == "k2u":
-        x_text = x_line[-1] - 15
-        y_text = y_visible_last - 23
-
-    elif op == "Copy" and kind == "k2u":
-        x_text = x_line[-1] - 15
-        y_text = y_visible_last + 10
-
-    else:
-        x_text = x_line[-1] - 15
-        y_text = y_label + 10
+    x_text = x_line[-1] - 15
+    y_text = y_label + 10
 
     # ax.text(
     #     x_text,
@@ -192,11 +156,11 @@ for (kind, op) in series_order:
     # )
 
 # Axes
-ax.set_xlabel("Message Size (kB)")
+ax.set_xlabel("Matrix size (n)")
 ax.set_ylabel("Mean duration (µs)")
 
 # Legend
-ax.legend(title="Method", loc="upper left")
+ax.legend(title="Method", loc="upper left", markerscale=1.3, handleheight=1.2)
 
 # Grid
 ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.4)
@@ -216,4 +180,4 @@ if has_clipped_points:
     )
 
 plt.tight_layout()
-plt.savefig("out/2_actor_comparison_qbic.pdf", bbox_inches="tight", pad_inches=0)
+plt.savefig("out/matmul_comparison_log.pdf", bbox_inches="tight", pad_inches=0)

@@ -36,12 +36,12 @@ palette = [palette[i] for i in [0,1,2,3,4,6,7,8]]
 palette = palette[:len(series_order)]
 
 series_labels = {
-    ("k2k", "Move"): "Kernel - Kernel / Page Table Move",
-    ("k2k", "Copy"): "Kernel - Kernel / Message Copy",
-    ("k2u", "Move"): "Kernel - User / Page Table Move",
-    ("k2u", "Copy"): "Kernel - User / Message Copy",
-    ("u2u", "Move"): "User - User / Page Table Move",
-    ("u2u", "Copy"): "User - User / Message Copy",
+    ("k2k", "Move"): "Kernel to Kernel / Page Move",
+    ("k2k", "Copy"): "Kernel to Kernel / Message Copy",
+    ("k2u", "Move"): "Kernel to User / Page Move",
+    ("k2u", "Copy"): "Kernel to User / Message Copy",
+    ("u2u", "Move"): "User to User / Page Move",
+    ("u2u", "Copy"): "User to User / Message Copy",
 }
 
 print(make_latency_latex_table(data, series_labels))

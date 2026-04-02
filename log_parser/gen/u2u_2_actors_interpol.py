@@ -100,6 +100,6 @@ ax.set_axisbelow(True)
 
 plt.ylabel("Mean duration (µs)")
 plt.xlabel("Message Size")
-plt.legend(title="Method", loc="upper left")
+plt.legend(title="Method", loc="upper left", markerscale=1.3, handleheight=1.2)
 
 plt.savefig("out/u2u_2_actors_regress.pdf", bbox_inches="tight", pad_inches=0)

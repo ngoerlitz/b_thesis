@@ -19,14 +19,18 @@ def _filename(filename: str) -> str:
 def get_label_legend(op):
     match op:
         case "Move":
-            return "Page Table Move"
+            return "Page Move"
         case "Copy":
             return "Message Copy"
 
     return "ERROR"
 
 
-def _format_size(n, force_decimals: bool):
+def _format_size(n, force_decimals: bool, force_size: bool = False):
+    if force_size:
+        print(f"{n/1000:.1f} kB")
+        return f"{n/1000:.1f} kB"
+
     if n <= 128:
         return f"{n}"
 
@@ -38,28 +42,7 @@ def _format_size(n, force_decimals: bool):
     else:
         return f"{n/1000:.1f} kB"
 
-    if n < 1000:
-        return f"{n} B"
-    elif n < 1_000_000:
-        return f"{n/1000:g} kB"
-    elif n < 1_000_000_000:
-        return f"{n/1_000_000:g} MB"
-    else:
-        return f"{n/1_000_000_000:g} GB"
-
-def remove_outliers_iqr(df):
-    grouped = df.groupby(["size", "op"])["duration_us"]
-
-    q1 = grouped.transform(lambda s: s.quantile(0.25))
-    q3 = grouped.transform(lambda s: s.quantile(0.75))
-    iqr = q3 - q1
-
-    lower = q1 - 1.5 * iqr
-    upper = q3 + 1.5 * iqr
-
-    return df[(df["duration_us"] >= lower) & (df["duration_us"] <= upper)]
-
-def open_df_matmul(filename: str, filter_sizes: list[int] | None = None, remove_outliers: bool = False, force_decimals: bool = False) -> pd.DataFrame:
+def open_df_matmul(filename: str, filter_sizes: list[int] | None = None, force_decimals: bool = False) -> pd.DataFrame:
     file = _filename(filename)
     df = pd.read_csv(file)
 
@@ -73,9 +56,6 @@ def open_df_matmul(filename: str, filter_sizes: list[int] | None = None, remove_
     })
 
     df["duration_us"] = df["duration_s"] * 1_000_000
-
-    if remove_outliers:
-        df = remove_outliers_iqr(df)
 
     df = df.groupby(["size", "op"], as_index=False).agg(
         mean_us=("duration_us", "mean"),
@@ -110,7 +90,7 @@ def open_df_matmul(filename: str, filter_sizes: list[int] | None = None, remove_
 
     return df
 
-def open_df(filename: str, filter_sizes: list[int] | None = None, remove_outliers: bool = False, force_decimals: bool = False) -> pd.DataFrame:
+def open_df(filename: str, filter_sizes: list[int] | None = None, force_decimals: bool = False, force_size: bool = False) -> pd.DataFrame:
     file = _filename(filename)
     df = pd.read_csv(file)
 
@@ -125,9 +105,6 @@ def open_df(filename: str, filter_sizes: list[int] | None = None, remove_outlier
 
     df["duration_us"] = df["duration_s"] * 1_000_000
 
-    if remove_outliers:
-        df = remove_outliers_iqr(df)
-
     df = df.groupby(["size", "op"], as_index=False).agg(
         mean_us=("duration_us", "mean"),
         std_us=("duration_us", "std"),
@@ -136,13 +113,13 @@ def open_df(filename: str, filter_sizes: list[int] | None = None, remove_outlier
 
     df["std_us"] = df["std_us"].fillna(0)
     df["sem_us"] = df["std_us"] / df["count"] ** 0.5
-    df["size_label"] = df["size"].apply(lambda x: _format_size(x, force_decimals))
+    df["size_label"] = df["size"].apply(lambda x: _format_size(x, force_decimals, force_size))
 
     size_order = sorted(df["size"].unique())
 
     df["size_label"] = pd.Categorical(
         df["size_label"],
-        categories=[_format_size(s, force_decimals) for s in size_order],
+        categories=[_format_size(s, force_decimals, force_size) for s in size_order],
         ordered=True
     )
 
@@ -174,7 +151,7 @@ def open_df_raw(filename: str) -> pd.DataFrame:
     return df
 
 def apply_basic_settings(ax: matplotlib.axes.Axes):
-    ax.legend(title="Method", loc="upper left")
+    ax.legend(title="Method", loc="upper left", markerscale=1.3, handleheight=1.2)
     ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
     ax.set_axisbelow(True)
 
@@ -276,8 +253,8 @@ def make_latency_latex_table(
       data: combined dataframe containing columns like:
             ["size", "kind", "op", "mean_us"]
       series_labels: mapping like:
-            ("k2k", "Move") -> "Kernel - Kernel / Page Table Move"
-            ("k2k", "Copy") -> "Kernel - Kernel / Message Copy"
+            ("k2k", "Move") -> "Kernel to Kernel / Page Move"
+            ("k2k", "Copy") -> "Kernel to Kernel / Message Copy"
             ...
 
     Required LaTeX packages:
@@ -299,15 +276,15 @@ def make_latency_latex_table(
             op_order.append(op)
 
     # Derive pretty kind labels from series_labels, e.g.
-    # ("k2k", "Move") -> "Kernel - Kernel / Page Table Move"
-    # kind label becomes "Kernel - Kernel"
+    # ("k2k", "Move") -> "Kernel to Kernel / Page Move"
+    # kind label becomes "Kernel to Kernel"
     kind_display = {}
     for (kind, op), label in series_labels.items():
         transport, _ = label.split(" / ", 1)
         kind_display[kind] = transport
 
     # Derive pretty op labels from series_labels, e.g.
-    # "Page Table Move" / "Message Copy"
+    # "Page Move" / "Message Copy"
     op_display = {}
     for (kind, op), label in series_labels.items():
         _, method = label.split(" / ", 1)

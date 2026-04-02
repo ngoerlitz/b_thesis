@@ -6,7 +6,7 @@ from gen.setup import apply_basic_settings, open_df, bar_plot_err, line_plot_err
 
 SIZES = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
 
-data = open_df("k2u_2_act.csv", SIZES)
+data = open_df("k2u_2_act.csv", SIZES, force_size=True)
 
 print(data)
 
@@ -98,6 +98,6 @@ ax.set_axisbelow(True)
 
 plt.ylabel("Mean duration (µs)")
 plt.xlabel("Message Size")
-plt.legend(title="Method", loc="upper left")
+plt.legend(title="Method", loc="upper left", markerscale=1.3, handleheight=1.2)
 
 plt.savefig("out/k2u_2_actors_regress.pdf", bbox_inches="tight", pad_inches=0)

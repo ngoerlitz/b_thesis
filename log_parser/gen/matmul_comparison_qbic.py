@@ -30,7 +30,7 @@ palette = sns.color_palette("Pastel1", 15)
 palette = [palette[i] for i in [0, 1, 2, 3, 4, 6]]
 
 series_labels = {
-    ("k2k", "Move"): "Page Table Move",
+    ("k2k", "Move"): "Page Move",
     ("k2k", "Copy"): "Message Copy",
 }
 
@@ -159,7 +159,7 @@ ax.set_xlabel("Matrix size (n)")
 ax.set_ylabel("Mean duration (µs)")
 
 # Legend
-ax.legend(title="Method", loc="upper left")
+ax.legend(title="Method", loc="upper left", markerscale=1.3, handleheight=1.2)
 
 # Grid
 ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.4)
@@ -179,4 +179,4 @@ if has_clipped_points:
     )
 
 plt.tight_layout()
-plt.savefig("out/matmul_comparison_qbic.pdf", bbox_inches="tight", pad_inches=0)
+plt.savefig("out/matmul_comparison_quadr.pdf", bbox_inches="tight", pad_inches=0)
