@@ -1,0 +1,14 @@
+{
+    "rust_file": "./kernel-playground/src/main.rs",
+    "sizes": [1, 2, 4, 8, 16, 32, 64, 128],
+    "tests": [
+        {
+            "name": "cpy",
+            "path": "tests::matmul::k2k_cpy::register_tests"
+        },
+        {
+            "name": "mov",
+            "path": "tests::matmul::k2k_mov::register_tests"
+        }
+    ]
+}

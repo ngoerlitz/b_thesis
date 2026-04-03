@@ -1,0 +1,10 @@
+**/*.pdf
+**/*.png
+__pycache__
+
+.idea
+.vscode
+
+_old
+_misc
+raw/*.log*

@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = [
+    "kernel",
+    "kernel-playground",
+    "kernel-derive"
+]
+
+[profile.dev]
+opt-level = 0
+panic = "abort"
+
+[profile.release]
+opt-level = 0
+panic = "abort"

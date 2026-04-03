@@ -1,0 +1,9 @@
+[package]
+name = "kernel-playground"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kernel = {path = "../kernel"}
+kernel-derive = {path = "../kernel-derive"}
+zcene-core = { path = "../../zcene/zcene-core" }

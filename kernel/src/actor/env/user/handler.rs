@@ -1,0 +1,64 @@
+use crate::actor::env::user::ctx::UserEnvironmentHandleCtx;
+use crate::actor::env::user::environment::UserEnvironment;
+use crate::utils::memory::leaking_heap_memory_alloc::NoOpMemoryAllocator;
+use alloc::boxed::Box;
+use core::arch::{asm, naked_asm};
+use core::marker::PhantomData;
+use core::pin::pin;
+use core::task::{Context, Poll, Waker};
+use zcene_core::actor::Actor;
+use crate::{kprintln, svc_call, uprintln};
+use crate::isr::SvcType;
+
+#[unsafe(link_section = ".user_text")]
+pub(crate) extern "C" fn user_create_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
+    let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
+
+    let mut future_ctx = Context::from_waker(Waker::noop());
+    let mut pinned = pin!(actor.create(()));
+
+    let _result = match pinned.as_mut().poll(&mut future_ctx) {
+        Poll::Pending => todo!(),
+        Poll::Ready(result) => result,
+    };
+
+    svc_call!(SvcType::ReturnEl1);
+    unreachable!()
+}
+
+#[unsafe(link_section = ".user_text")]
+pub(crate) extern "C" fn user_message_handler<A: Actor<UserEnvironment>>(
+    actor: *mut A,
+    msg: *const A::Message,
+) -> ! {
+    let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
+
+    let mut future_ctx = Context::from_waker(Waker::noop());
+    let mut pinned = pin!(actor.handle(UserEnvironmentHandleCtx::<A::Message>::new(msg as *const _ as u64, PhantomData)));
+
+    let _result = match pinned.as_mut().poll(&mut future_ctx) {
+        Poll::Pending => todo!(),
+        Poll::Ready(result) => result,
+    };
+
+    svc_call!(SvcType::ReturnEl1);
+    unreachable!()
+}
+
+#[unsafe(link_section = ".user_text")]
+pub(crate) extern "C" fn user_destroy_handler<A: Actor<UserEnvironment>>(actor: *mut A) -> ! {
+    // uprintln!("[USER_HANDLER] DESTROY HANDLER!!! A: {:#X}", actor as u64);
+
+    let mut actor = unsafe { Box::from_raw_in(actor, NoOpMemoryAllocator) };
+
+    let mut future_ctx = Context::from_waker(Waker::noop());
+    let mut pinned = pin!(actor.destroy(()));
+
+    let _result = match pinned.as_mut().poll(&mut future_ctx) {
+        Poll::Pending => todo!(),
+        Poll::Ready(result) => result,
+    };
+
+    svc_call!(SvcType::ReturnEl1);
+    unreachable!()
+}

@@ -1,0 +1,24 @@
+
+\begin{table}[H]
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{l C{2.5cm} C{2.5cm} C{2.5cm} C{2.5cm}}
+        \hline
+        & \multicolumn{3}{c}{\textbf{Mean Duration (\si{\us})}} & \\
+        \textbf{Message Size} & \textbf{Copy} & \textbf{Move} & \textbf{$\Delta$} & \textbf{Ratio} \\ \toprule
+        
+    1 kB & 20.14 $\pm$ 1.04 & 20.21 $\pm$ 1.49 & -0.07 $\pm$ 1.81 & 1.00 $\pm$ 0.09 \\ \hline
+    2 kB & 20.97 $\pm$ 0.76 & 20.07 $\pm$ 1.49 & 0.90 $\pm$ 1.67 & 1.04 $\pm$ 0.09 \\ \hline
+    4 kB & 22.01 $\pm$ 0.91 & 20.32 $\pm$ 1.45 & 1.69 $\pm$ 1.71 & 1.08 $\pm$ 0.09 \\ \hline
+    8 kB & 23.88 $\pm$ 1.05 & 20.42 $\pm$ 1.33 & 3.46 $\pm$ 1.69 & 1.17 $\pm$ 0.09 \\ \hline
+    16 kB & 30.50 $\pm$ 0.97 & 20.44 $\pm$ 0.88 & 10.06 $\pm$ 1.31 & 1.49 $\pm$ 0.08 \\ \hline
+    32 kB & 40.21 $\pm$ 1.32 & 20.74 $\pm$ 1.39 & 19.47 $\pm$ 1.91 & 1.94 $\pm$ 0.14 \\ \hline
+    64 kB & 61.29 $\pm$ 0.99 & 20.38 $\pm$ 1.02 & 40.91 $\pm$ 1.42 & 3.01 $\pm$ 0.16 \\ \hline
+    128 kB & 101.98 $\pm$ 0.86 & 20.90 $\pm$ 1.39 & 81.08 $\pm$ 1.64 & 4.88 $\pm$ 0.33 \\ \hline
+    256 kB & 192.84 $\pm$ 0.92 & 20.42 $\pm$ 0.96 & 172.42 $\pm$ 1.33 & 9.44 $\pm$ 0.45 \\ \hline
+    \end{tabular}
+    \caption{Results of single message U2U experiment with difference and ratio}
+    \label{tab:u2u_msg}
+\end{table}

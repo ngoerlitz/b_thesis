@@ -1,0 +1,28 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+
+[dependencies]
+bitflags = { version = "2.9" }
+spin = { version = "0.10" }
+zcene-core = { path = "../../zcene/zcene-core" }
+linked_list_allocator = { version = "0.10" }
+paste = { version = "1" }
+kernel-derive = { path = "../kernel-derive" }
+cfg-if = { version = "1.0.4" }
+async-channel = { version = "2", default-features = false }
+
+[features]
+log_debug = []
+log_cores = []
+hardware = []
+qemu = []
+single_core = []
+test = []
+
+[build-dependencies]
+cc = "*"
+glob = "*"
